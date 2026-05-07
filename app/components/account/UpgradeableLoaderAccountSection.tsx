@@ -2,11 +2,12 @@ import { UnknownAccountCard } from '@components/account/UnknownAccountCard';
 import { Address } from '@components/common/Address';
 import { DownloadableIcon } from '@components/common/Downloadable';
 import { InfoTooltip } from '@components/common/InfoTooltip';
-import { SecurityTXTBadge } from '@components/common/SecurityTXTBadge';
 import { Slot } from '@components/common/Slot';
 import { SolBalance } from '@components/common/SolBalance';
 import { TableCardBody } from '@components/common/TableCardBody';
-import { Account, useFetchAccountInfo } from '@providers/accounts';
+import { useRefreshAccount } from '@entities/account';
+import { AccountDownloadDropdown } from '@features/account';
+import { Account } from '@providers/accounts';
 import { useCluster } from '@providers/cluster';
 import { PublicKey } from '@solana/web3.js';
 import { addressLabel } from '@utils/tx';
@@ -20,7 +21,10 @@ import Link from 'next/link';
 import React from 'react';
 import { ExternalLink, RefreshCw } from 'react-feather';
 
+import { ProgramSecurityTXTBadge } from '@/app/features/security-txt/ui/SecurityTXTBadge';
+import { ProgramSecurityTXTLabel } from '@/app/features/security-txt/ui/SecurityTXTLabel';
 import { useSquadsMultisigLookup } from '@/app/providers/squadsMultisig';
+import { refreshAnalytics } from '@/app/shared/lib/analytics';
 import { Cluster } from '@/app/utils/cluster';
 import { useClusterPath } from '@/app/utils/url';
 
@@ -66,7 +70,7 @@ export function UpgradeableProgramSection({
     programAccount: ProgramAccountInfo;
     programData: ProgramDataAccountInfo | undefined;
 }) {
-    const refresh = useFetchAccountInfo();
+    const refresh = useRefreshAccount();
     const { cluster } = useCluster();
     const { data: squadMapInfo } = useSquadsMultisigLookup(programData?.authority, cluster);
 
@@ -74,14 +78,21 @@ export function UpgradeableProgramSection({
 
     return (
         <div className="card">
-            <div className="card-header">
+            <div className="card-header e-gap-2">
                 <h3 className="card-header-title mb-0 d-flex align-items-center">
                     {programData === undefined && 'Closed '}Program Account
                 </h3>
-                <button className="btn btn-white btn-sm" onClick={() => refresh(account.pubkey, 'parsed')}>
+                <button
+                    className="btn btn-white btn-sm"
+                    onClick={() => {
+                        refreshAnalytics.trackButtonClicked('program_section');
+                        refresh(account.pubkey, 'parsed');
+                    }}
+                >
                     <RefreshCw className="align-text-top me-2" size={13} />
                     Refresh
                 </button>
+                <AccountDownloadDropdown pubkey={account.pubkey} space={account.space} />
             </div>
 
             <TableCardBody>
@@ -129,10 +140,10 @@ export function UpgradeableProgramSection({
                         </tr>
                         <tr>
                             <td>
-                                <SecurityLabel />
+                                <ProgramSecurityTXTLabel programPubkey={account.pubkey} />
                             </td>
                             <td className="text-lg-end">
-                                <SecurityTXTBadge programData={programData} pubkey={account.pubkey} />
+                                <ProgramSecurityTXTBadge programData={programData} programPubkey={account.pubkey} />
                             </td>
                         </tr>
                         <tr>
@@ -172,20 +183,9 @@ function MultisigBadge({ pubkey }: { pubkey: PublicKey }) {
     );
 }
 
-function SecurityLabel() {
-    return (
-        <InfoTooltip text="Security.txt helps security researchers to contact developers if they find security bugs.">
-            <Link rel="noopener noreferrer" target="_blank" href="https://github.com/neodyme-labs/solana-security-txt">
-                <span className="security-txt-link-color-hack-reee">Security.txt</span>
-                <ExternalLink className="align-text-top ms-2" size={13} />
-            </Link>
-        </InfoTooltip>
-    );
-}
-
 function VerifiedLabel() {
     return (
-        <InfoTooltip text="Verified builds allow users can ensure that the hash of the on-chain program matches the hash of the program of the given codebase (registry hosted by osec.io).">
+        <InfoTooltip text="Verified builds allow users to ensure that the hash of the on-chain program matches the hash of the program of the given codebase (registry hosted by osec.io).">
             <Link
                 rel="noopener noreferrer"
                 target="_blank"
@@ -205,12 +205,18 @@ export function UpgradeableProgramDataSection({
     account: Account;
     programData: ProgramDataAccountInfo;
 }) {
-    const refresh = useFetchAccountInfo();
+    const refresh = useRefreshAccount();
     return (
         <div className="card">
             <div className="card-header">
                 <h3 className="card-header-title mb-0 d-flex align-items-center">Program Executable Data Account</h3>
-                <button className="btn btn-white btn-sm" onClick={() => refresh(account.pubkey, 'parsed')}>
+                <button
+                    className="btn btn-white btn-sm"
+                    onClick={() => {
+                        refreshAnalytics.trackButtonClicked('program_data_section');
+                        refresh(account.pubkey, 'parsed');
+                    }}
+                >
                     <RefreshCw className="align-text-top me-2" size={13} />
                     Refresh
                 </button>
@@ -269,12 +275,18 @@ export function UpgradeableProgramBufferSection({
     account: Account;
     programBuffer: ProgramBufferAccountInfo;
 }) {
-    const refresh = useFetchAccountInfo();
+    const refresh = useRefreshAccount();
     return (
         <div className="card">
             <div className="card-header">
                 <h3 className="card-header-title mb-0 d-flex align-items-center">Program Deploy Buffer Account</h3>
-                <button className="btn btn-white btn-sm" onClick={() => refresh(account.pubkey, 'parsed')}>
+                <button
+                    className="btn btn-white btn-sm"
+                    onClick={() => {
+                        refreshAnalytics.trackButtonClicked('program_buffer_section');
+                        refresh(account.pubkey, 'parsed');
+                    }}
+                >
                     <RefreshCw className="align-text-top me-2" size={13} />
                     Refresh
                 </button>

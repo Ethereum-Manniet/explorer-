@@ -1,9 +1,11 @@
+import { AccountCard } from '@features/account';
 import { Account } from '@providers/accounts';
 import { PublicKey } from '@solana/web3.js';
 import { createRef, Suspense } from 'react';
 import { ChevronDown, ExternalLink } from 'react-feather';
 import useAsyncEffect from 'use-async-effect';
 
+import { getProxiedUri } from '@/app/features/metadata';
 import { useCluster } from '@/app/providers/cluster';
 import { CompressedNft, useCompressedNft, useMetadataJsonLink } from '@/app/providers/compressed-nft';
 
@@ -11,7 +13,6 @@ import { Address } from '../common/Address';
 import { InfoTooltip } from '../common/InfoTooltip';
 import { LoadingArtPlaceholder } from '../common/LoadingArtPlaceholder';
 import { ArtContent } from '../common/NFTArt';
-import { TableCardBody } from '../common/TableCardBody';
 import { getCreatorDropdownItems, getIsMutablePill, getVerifiedCollectionPill } from './MetaplexNFTHeader';
 import { UnknownAccountCard } from './UnknownAccountCard';
 
@@ -24,58 +25,53 @@ export function CompressedNftCard({ account }: { account: Account }) {
     const updateAuthority = compressedNft.authorities.find(authority => authority.scopes.includes('full'))?.address;
 
     return (
-        <div className="card">
-            <div className="card-header">
-                <h3 className="card-header-title mb-0 d-flex align-items-center">Overview</h3>
-            </div>
-            <TableCardBody>
-                <tr>
-                    <td>Address</td>
-                    <td className="text-lg-end">
-                        <Address pubkey={account.pubkey} alignRight raw />
-                    </td>
-                </tr>
-                <tr>
-                    <td>Owner</td>
-                    <td className="text-lg-end">
-                        <Address pubkey={new PublicKey(compressedNft.ownership.owner)} alignRight link />
-                    </td>
-                </tr>
-                <tr>
-                    <td>Verified Collection Address</td>
-                    <td className="text-lg-end">
-                        {collectionGroup ? (
-                            <Address pubkey={new PublicKey(collectionGroup.group_value)} alignRight link />
-                        ) : (
-                            'None'
-                        )}
-                    </td>
-                </tr>
-                <tr>
-                    <td>Update Authority</td>
-                    <td className="text-lg-end">
-                        {updateAuthority ? <Address pubkey={new PublicKey(updateAuthority)} alignRight link /> : 'None'}
-                    </td>
-                </tr>
-                <tr>
-                    <td>Website</td>
-                    <td className="text-lg-end">
-                        <a rel="noopener noreferrer" target="_blank" href={compressedNft.content.links.external_url}>
-                            {compressedNft.content.links.external_url}
-                            <ExternalLink className="align-text-top ms-2" size={13} />
-                        </a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Seller Fee</td>
-                    <td className="text-lg-end">{`${compressedNft.royalty.basis_points / 100}%`}</td>
-                </tr>
-            </TableCardBody>
-        </div>
+        <AccountCard title="Overview" account={account}>
+            <tr>
+                <td>Address</td>
+                <td className="text-lg-end">
+                    <Address pubkey={account.pubkey} alignRight raw />
+                </td>
+            </tr>
+            <tr>
+                <td>Owner</td>
+                <td className="text-lg-end">
+                    <Address pubkey={new PublicKey(compressedNft.ownership.owner)} alignRight link />
+                </td>
+            </tr>
+            <tr>
+                <td>Verified Collection Address</td>
+                <td className="text-lg-end">
+                    {collectionGroup ? (
+                        <Address pubkey={new PublicKey(collectionGroup.group_value)} alignRight link />
+                    ) : (
+                        'None'
+                    )}
+                </td>
+            </tr>
+            <tr>
+                <td>Update Authority</td>
+                <td className="text-lg-end">
+                    {updateAuthority ? <Address pubkey={new PublicKey(updateAuthority)} alignRight link /> : 'None'}
+                </td>
+            </tr>
+            <tr>
+                <td>Website</td>
+                <td className="text-lg-end">
+                    <a rel="noopener noreferrer" target="_blank" href={compressedNft.content.links.external_url}>
+                        {compressedNft.content.links.external_url}
+                        <ExternalLink className="align-text-top ms-2" size={13} />
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <td>Seller Fee</td>
+                <td className="text-lg-end">{`${compressedNft.royalty.basis_points / 100}%`}</td>
+            </tr>
+        </AccountCard>
     );
 }
 
-export function CompressedNftAccountHeader({ account }: { account: Account }) {
+export function CompressedNftAccountHeader({ account, fallback }: { account: Account; fallback?: React.ReactElement }) {
     const { url } = useCluster();
     const compressedNft = useCompressedNft({ address: account.pubkey.toString(), url });
 
@@ -86,11 +82,13 @@ export function CompressedNftAccountHeader({ account }: { account: Account }) {
             </Suspense>
         );
     }
-    return <div />;
+    return fallback || <div />;
 }
 
 export function CompressedNFTHeader({ compressedNft }: { compressedNft: CompressedNft }) {
-    const metadataJson = useMetadataJsonLink(compressedNft.content.json_uri);
+    // Empty strings are possible, so the check is necessary.
+    const proxiedURI = compressedNft.content.json_uri ? getProxiedUri(compressedNft.content.json_uri) : null;
+    const metadataJson = useMetadataJsonLink(proxiedURI);
     const dropdownRef = createRef<HTMLButtonElement>();
 
     useAsyncEffect(
@@ -109,7 +107,7 @@ export function CompressedNFTHeader({ compressedNft }: { compressedNft: Compress
                 dropdown.dispose();
             }
         },
-        [dropdownRef]
+        [dropdownRef],
     );
 
     return (

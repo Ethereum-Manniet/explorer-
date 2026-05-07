@@ -4,14 +4,20 @@ import { ErrorCard } from '@components/common/ErrorCard';
 import { LoadingCard } from '@components/common/LoadingCard';
 import { SolBalance } from '@components/common/SolBalance';
 import { TableCardBody } from '@components/common/TableCardBody';
+import { SimulatorCard } from '@features/instruction-simulation';
 import { useFetchAccountInfo } from '@providers/accounts';
 import { FetchStatus } from '@providers/cache';
 import { useFetchRawTransaction, useRawTransactionDetails } from '@providers/transactions/raw';
 import usePrevious from '@react-hook/previous';
-import { Connection, MessageV0, PACKET_DATA_SIZE, PublicKey, VersionedMessage } from '@solana/web3.js';
+import {
+    type CompiledInnerInstruction,
+    Connection,
+    MessageV0,
+    PACKET_DATA_SIZE,
+    PublicKey,
+    VersionedMessage,
+} from '@solana/web3.js';
 import { generated, PROGRAM_ADDRESS as SQUADS_V4_PROGRAM_ADDRESS } from '@sqds/multisig';
-const { VaultTransaction } = generated;
-
 import { useClusterPath } from '@utils/url';
 import bs58 from 'bs58';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -19,6 +25,8 @@ import React from 'react';
 import useSWR from 'swr';
 
 import { useCluster } from '@/app/providers/cluster';
+import { DownloadDropdown } from '@/app/shared/components/DownloadDropdown';
+import { toBase64 } from '@/app/shared/lib/bytes';
 
 import { AccountsCard } from './AccountsCard';
 import { AddressTableLookupsCard } from './AddressTableLookupsCard';
@@ -26,12 +34,18 @@ import { AddressWithContext, createFeePayerValidator } from './AddressWithContex
 import { InstructionsSection } from './InstructionsSection';
 import { MIN_MESSAGE_LENGTH, RawInput } from './RawInputCard';
 import { TransactionSignatures } from './SignaturesCard';
-import { SimulatorCard } from './SimulatorCard';
+
+const { VaultTransaction } = generated;
 
 export type TransactionData = {
     rawMessage: Uint8Array;
     message: VersionedMessage;
-    signatures?: (string | null)[];
+    signatures?: (string | undefined)[];
+    accountBalances?: {
+        preBalances: number[];
+        postBalances: number[];
+    };
+    compiledInnerInstructions?: CompiledInnerInstruction[];
 };
 
 export type SquadsProposalAccountData = {
@@ -51,17 +65,17 @@ function decodeParam(params: URLSearchParams, name: string): string | boolean {
     if (param === null) return false;
     try {
         return decodeURIComponent(param);
-    } catch (err) {
+    } catch (_err) {
         return true;
     }
 }
 
 // Decode a signatures param and throw an error on failure
-function decodeSignatures(signaturesParam: string): (string | null)[] {
+function decodeSignatures(signaturesParam: string): (string | undefined)[] {
     let signatures;
     try {
         signatures = JSON.parse(signaturesParam);
-    } catch (err) {
+    } catch (_err) {
         throw new Error('Signatures param is not valid JSON');
     }
 
@@ -69,10 +83,10 @@ function decodeSignatures(signaturesParam: string): (string | null)[] {
         throw new Error('Signatures param is not a JSON array');
     }
 
-    const validSignatures: (string | null)[] = [];
+    const validSignatures: (string | undefined)[] = [];
     for (const signature of signatures) {
-        if (signature === null) {
-            validSignatures.push(signature);
+        if (signature === null || signature === undefined) {
+            validSignatures.push(undefined);
             continue;
         }
 
@@ -83,7 +97,7 @@ function decodeSignatures(signaturesParam: string): (string | null)[] {
         try {
             bs58.decode(signature);
             validSignatures.push(signature);
-        } catch (err) {
+        } catch (_err) {
             throw new Error('Signature is not valid base58');
         }
     }
@@ -95,7 +109,7 @@ function decodeSignatures(signaturesParam: string): (string | null)[] {
 // URL params are returned as a string that will prefill the transaction
 // message input field for debugging. Returns a tuple of [result, shouldRefreshUrl]
 function decodeUrlParams(
-    params: URLSearchParams
+    params: URLSearchParams,
 ): [TransactionData | string | SquadsProposalAccountData, URLSearchParams, boolean] {
     const messageParam = decodeParam(params, 'message');
     const signaturesParam = decodeParam(params, 'signatures');
@@ -113,7 +127,7 @@ function decodeUrlParams(
             // Validate that it's a valid public key
             new PublicKey(squadsTxParam);
             return [{ account: squadsTxParam }, params, refreshUrl];
-        } catch (err) {
+        } catch (_err) {
             params.delete('squadsTx');
             refreshUrl = true;
         }
@@ -128,11 +142,11 @@ function decodeUrlParams(
         return ['', params, refreshUrl];
     }
 
-    let signatures: (string | null)[] | undefined = undefined;
+    let signatures: (string | undefined)[] | undefined = undefined;
     if (typeof signaturesParam === 'string') {
         try {
             signatures = decodeSignatures(signaturesParam);
-        } catch (err) {
+        } catch (_err) {
             params.delete('signatures');
             refreshUrl = true;
         }
@@ -152,7 +166,7 @@ function decodeUrlParams(
             signatures,
         };
         return [data, params, refreshUrl];
-    } catch (err) {
+    } catch (_err) {
         params.delete('message');
         refreshUrl = true;
         return [messageParam, params, true];
@@ -219,7 +233,7 @@ function SquadsProposalInspectorCard({ account, onClear }: { account: string; on
             })),
             compiledInstructions: message.instructions.map(instruction => ({
                 accountKeyIndexes: Array.from(instruction.accountIndexes),
-                data: Buffer.from(instruction.data),
+                data: instruction.data,
                 programIdIndex: instruction.programIdIndex,
             })),
             header: {
@@ -292,7 +306,7 @@ export function TransactionInspectorPage({
                 }
             }
 
-            const base64 = btoa(String.fromCharCode.apply(null, Array.from(inspectorData.rawMessage)));
+            const base64 = toBase64(inspectorData.rawMessage);
             const newParam = encodeURIComponent(base64);
             if (currentSearchParams.get('message') !== newParam) {
                 nextQueryParams ||= new URLSearchParams(currentSearchParams?.toString());
@@ -388,9 +402,14 @@ function PermalinkView({
         return <ErrorCard text="Transaction was not found" retry={reset} retryText="Reset" />;
     }
 
-    const { message, signatures } = transaction;
-    const tx = { message, rawMessage: message.serialize(), signatures };
-
+    const { message, signatures, meta } = transaction;
+    const tx = {
+        accountBalances: meta,
+        compiledInnerInstructions: meta?.innerInstructions,
+        message,
+        rawMessage: message.serialize(),
+        signatures,
+    };
     return <LoadedView transaction={tx} onClear={reset} showTokenBalanceChanges={showTokenBalanceChanges} />;
 }
 
@@ -403,7 +422,7 @@ function LoadedView({
     onClear: () => void;
     showTokenBalanceChanges: boolean;
 }) {
-    const { message, rawMessage, signatures } = transaction;
+    const { message, rawMessage, signatures, accountBalances, compiledInnerInstructions } = transaction;
 
     const fetchAccountInfo = useFetchAccountInfo();
     React.useEffect(() => {
@@ -415,11 +434,15 @@ function LoadedView({
     return (
         <>
             <OverviewCard message={message} raw={rawMessage} onClear={onClear} />
-            <SimulatorCard message={message} showTokenBalanceChanges={showTokenBalanceChanges} />
+            <SimulatorCard
+                message={message}
+                showTokenBalanceChanges={showTokenBalanceChanges}
+                accountBalances={accountBalances}
+            />
             {signatures && <TransactionSignatures message={message} signatures={signatures} rawMessage={rawMessage} />}
             <AccountsCard message={message} />
             <AddressTableLookupsCard message={message} />
-            <InstructionsSection message={message} />
+            <InstructionsSection message={message} compiledInnerInstructions={compiledInnerInstructions} />
         </>
     );
 }
@@ -428,7 +451,17 @@ const DEFAULT_FEES = {
     lamportsPerSignature: 5000,
 };
 
-function OverviewCard({ message, raw, onClear }: { message: VersionedMessage; raw: Uint8Array; onClear: () => void }) {
+function OverviewCard({
+    message,
+    raw,
+    onClear,
+    signature,
+}: {
+    message: VersionedMessage;
+    raw: Uint8Array;
+    onClear: () => void;
+    signature?: string;
+}) {
     const fee = message.header.numRequiredSignatures * DEFAULT_FEES.lamportsPerSignature;
     const feePayerValidator = createFeePayerValidator(fee);
 
@@ -440,11 +473,12 @@ function OverviewCard({ message, raw, onClear }: { message: VersionedMessage; ra
     return (
         <>
             <div className="card">
-                <div className="card-header">
+                <div className="card-header e-gap-2">
                     <h3 className="card-header-title">Transaction Overview</h3>
                     <button className="btn btn-sm d-flex btn-white" onClick={onClear}>
                         Clear
                     </button>
+                    <DownloadDropdown filename={signature || 'signature'} data={raw} />
                 </div>
                 <TableCardBody>
                     <tr>

@@ -3,15 +3,29 @@
 import * as Cache from '@providers/cache';
 import { ActionType, FetchStatus } from '@providers/cache';
 import { useCluster } from '@providers/cluster';
-import { Connection, DecompileArgs, TransactionMessage, TransactionSignature, VersionedMessage } from '@solana/web3.js';
+import {
+    type CompiledInnerInstruction,
+    Connection,
+    type DecompileArgs,
+    TransactionMessage,
+    type TransactionSignature,
+    type VersionedMessage,
+} from '@solana/web3.js';
 import { Cluster } from '@utils/cluster';
 import React from 'react';
 
+import { Logger } from '@/app/shared/lib/logger';
+
 export interface Details {
     raw?: {
-        transaction: TransactionMessage;
         message: VersionedMessage;
+        meta?: {
+            innerInstructions?: CompiledInnerInstruction[];
+            postBalances: number[];
+            preBalances: number[];
+        };
         signatures: string[];
+        transaction: TransactionMessage;
     } | null;
 }
 
@@ -63,6 +77,13 @@ async function fetchRawTransaction(dispatch: Dispatch, signature: TransactionSig
             data = {
                 raw: {
                     message,
+                    meta: response.meta
+                        ? {
+                              innerInstructions: response.meta.innerInstructions ?? undefined,
+                              postBalances: response.meta.postBalances,
+                              preBalances: response.meta.preBalances,
+                          }
+                        : undefined,
                     signatures,
                     transaction: TransactionMessage.decompile(message, decompileArgs),
                 },
@@ -78,7 +99,7 @@ async function fetchRawTransaction(dispatch: Dispatch, signature: TransactionSig
         });
     } catch (error) {
         if (cluster !== Cluster.Custom) {
-            console.error(error, { url });
+            Logger.error(error, { url });
         }
     }
 }
@@ -94,6 +115,6 @@ export function useFetchRawTransaction() {
         (signature: TransactionSignature) => {
             url && fetchRawTransaction(dispatch, signature, cluster, url);
         },
-        [dispatch, cluster, url]
+        [dispatch, cluster, url],
     );
 }

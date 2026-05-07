@@ -6,13 +6,15 @@ import {
     AssignWithSeedInfo,
     AuthorizeNonceInfo,
     CreateAccountInfo,
-    CreateAccountWithSeedInfo,
     InitializeNonceInfo,
     TransferInfo,
     TransferWithSeedInfo,
     UpgradeNonceInfo,
     WithdrawNonceInfo,
 } from '@components/instruction/system/types';
+import { parseMetaplexTokenMetadataInstruction } from '@features/mpl-token-metadata';
+import { MPL_TOKEN_METADATA_PROGRAM_ID } from '@metaplex-foundation/mpl-token-metadata';
+import { TOKEN_PROGRAM_ID } from '@providers/accounts/tokens';
 import {
     AccountMeta,
     AccountRole,
@@ -42,7 +44,6 @@ import {
     parseAssignWithSeedInstruction,
     parseAuthorizeNonceAccountInstruction,
     parseCreateAccountInstruction,
-    parseCreateAccountWithSeedInstruction,
     parseInitializeNonceAccountInstruction,
     parseTransferSolInstruction,
     parseTransferSolWithSeedInstruction,
@@ -58,6 +59,13 @@ import {
     parseCreateAssociatedTokenInstruction,
     parseRecoverNestedAssociatedTokenInstruction,
 } from '@solana-program/token';
+import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022';
+
+import { alloc, bytes, equals, toBuffer } from '@/app/shared/lib/bytes';
+
+import { parseTokenProgramInstruction } from './instruction-parsers/spl-token.parser';
+import { parseSystemProgramInstruction } from './instruction-parsers/system-program.parser';
+import { parseToken2022Instruction } from './instruction-parsers/token-2022-program.parser';
 
 /**
  * Helper function to safely convert BigInt or number to regular number
@@ -77,18 +85,6 @@ function convertCreateAccountInfo(parsed: any): CreateAccountInfo {
         lamports: safeNumber(parsed.data.lamports),
         newAccount: new PublicKey(parsed.accounts.newAccount.address),
         owner: new PublicKey(parsed.data.programAddress),
-        source: new PublicKey(parsed.accounts.payer.address),
-        space: safeNumber(parsed.data.space),
-    };
-}
-
-function convertCreateAccountWithSeedInfo(parsed: any): CreateAccountWithSeedInfo {
-    return {
-        base: new PublicKey(parsed.accounts.baseAccount.address),
-        lamports: safeNumber(parsed.data.amount), // Note: field is 'amount' not 'lamports'
-        newAccount: new PublicKey(parsed.accounts.newAccount.address),
-        owner: new PublicKey(parsed.data.programAddress),
-        seed: parsed.data.seed,
         source: new PublicKey(parsed.accounts.payer.address),
         space: safeNumber(parsed.data.space),
     };
@@ -172,8 +168,8 @@ function convertTransferWithSeedInfo(parsed: any): TransferWithSeedInfo {
         lamports: safeNumber(parsed.data.amount),
         source: new PublicKey(parsed.accounts.source.address),
         sourceBase: new PublicKey(parsed.accounts.baseAccount.address),
-        sourceOwner: new PublicKey(parsed.accounts.sourceOwner.address),
-        sourceSeed: parsed.data.seed,
+        sourceOwner: new PublicKey(parsed.data.fromOwner),
+        sourceSeed: parsed.data.fromSeed,
     };
 }
 
@@ -183,20 +179,24 @@ function convertUpgradeNonceInfo(parsed: any): UpgradeNonceInfo {
     };
 }
 
-function discriminatorToBuffer(discrimnator: number): Buffer {
-    return Buffer.from(Uint8Array.from([discrimnator]));
+function discriminatorToBytes(discrimnator: number): Uint8Array {
+    return bytes([discrimnator]);
 }
 
 function intoProgramName(programId: PublicKey): string | undefined {
     if (programId.equals(spl.ASSOCIATED_TOKEN_PROGRAM_ID)) {
         return 'spl-associated-token-account';
     }
+    if (programId.equals(TOKEN_PROGRAM_ID)) {
+        return 'spl-token';
+    }
+    if (programId.toBase58() === TOKEN_2022_PROGRAM_ADDRESS) {
+        return 'spl-token-2022';
+    }
+    if (programId.toBase58() === MPL_TOKEN_METADATA_PROGRAM_ID) {
+        return 'mpl-token-metadata';
+    }
     /* add other variants here */
-}
-
-function isDataEqual(data1: Buffer, data2: Buffer): boolean {
-    // Browser will fail if data2 is created with Uint8Array.from
-    return data1.equals(data2);
 }
 
 function intoParsedData(instruction: TransactionInstruction, parsed?: any): any {
@@ -209,8 +209,8 @@ function intoParsedData(instruction: TransactionInstruction, parsed?: any): any 
         let instructionData = data;
 
         // workaround for "create" instructions
-        if (isDataEqual(data, Buffer.alloc(CREATE_ASSOCIATED_TOKEN_DISCRIMINATOR))) {
-            instructionData = discriminatorToBuffer(CREATE_ASSOCIATED_TOKEN_DISCRIMINATOR);
+        if (equals(data, alloc(CREATE_ASSOCIATED_TOKEN_DISCRIMINATOR))) {
+            instructionData = toBuffer(discriminatorToBytes(CREATE_ASSOCIATED_TOKEN_DISCRIMINATOR));
             instruction.data = instructionData; // overwrite original data with the modified one
         }
 
@@ -259,10 +259,9 @@ function intoParsedData(instruction: TransactionInstruction, parsed?: any): any 
                 break;
             }
             case SystemInstruction.CreateAccountWithSeed: {
-                type = 'createAccountWithSeed';
-                const idata = intoInstructionData(instruction);
-                const parsed = parseCreateAccountWithSeedInstruction(idata);
-                info = convertCreateAccountWithSeedInfo(parsed);
+                const parsed = parseSystemProgramInstruction(instruction);
+                type = parsed?.type ?? UNKNOWN_PROGRAM_TYPE;
+                info = parsed?.info ?? {};
                 break;
             }
             case SystemInstruction.Allocate: {
@@ -351,9 +350,43 @@ function intoParsedData(instruction: TransactionInstruction, parsed?: any): any 
             info: parsed ?? info, // allow for "parsed" to take priority over "info"
             type,
         };
+    } else if (programId.equals(TOKEN_PROGRAM_ID)) {
+        const result = parseTokenProgramInstruction(instruction);
+        if (result) {
+            return {
+                info: parsed ?? result.info,
+                type: result.type,
+            };
+        }
+        return {
+            info: parsed ?? info,
+            type: UNKNOWN_PROGRAM_TYPE,
+        };
+    } else if (programId.toBase58() === TOKEN_2022_PROGRAM_ADDRESS) {
+        const result = parseToken2022Instruction(instruction);
+        if (result) {
+            return {
+                info: parsed ?? result.info,
+                type: result.type,
+            };
+        }
+        return {
+            info: parsed ?? info,
+            type: UNKNOWN_PROGRAM_TYPE,
+        };
+    } else if (programId.toBase58() === MPL_TOKEN_METADATA_PROGRAM_ID) {
+        const result = parseMetaplexTokenMetadataInstruction(instruction);
+        if (result) {
+            return {
+                info: parsed ?? result.info,
+                type: result.type,
+            };
+        }
+        return {
+            info: parsed ?? info,
+            type: UNKNOWN_PROGRAM_TYPE,
+        };
     }
-
-    /* add other variants here */
 
     return {
         info: parsed ?? info,
@@ -402,22 +435,21 @@ export function intoParsedInstruction(transactionInstruction: TransactionInstruc
 
 export function intoParsedTransaction(
     transactionInstruction: TransactionInstruction,
-    versionedMessage: VersionedMessage
+    versionedMessage: VersionedMessage,
+    instructions: ParsedMessage['instructions'] = [],
+    signatures: string[] = [],
 ): ParsedTransaction {
     const { keys } = transactionInstruction;
     const { addressTableLookups, recentBlockhash } = versionedMessage;
 
-    const parsedMessage: ParsedMessage = {
-        accountKeys: convertAccountKeysToParsedMessageAccounts(keys),
-        addressTableLookups,
-        // at this moment we do not parse instructions as they are not required to represent the transaction. that's why array is empty
-        instructions: [],
-        recentBlockhash,
-    };
-
     return {
-        message: parsedMessage,
-        signatures: [],
+        message: {
+            accountKeys: convertAccountKeysToParsedMessageAccounts(keys),
+            addressTableLookups,
+            instructions,
+            recentBlockhash,
+        },
+        signatures,
     };
 }
 
@@ -429,8 +461,8 @@ export function upcastAccountMeta({ pubkey, isSigner, isWritable }: LegacyAccoun
                 ? AccountRole.WRITABLE_SIGNER
                 : AccountRole.READONLY_SIGNER
             : isWritable
-            ? AccountRole.WRITABLE
-            : AccountRole.READONLY,
+              ? AccountRole.WRITABLE
+              : AccountRole.READONLY,
     };
 }
 

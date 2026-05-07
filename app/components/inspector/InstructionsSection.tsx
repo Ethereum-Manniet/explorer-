@@ -1,35 +1,50 @@
 import { BaseInstructionCard } from '@components/common/BaseInstructionCard';
+import { useAnchorProgram } from '@entities/idl';
+import { MetaplexTokenMetadataDetailsCard } from '@features/mpl-token-metadata';
+import { MPL_TOKEN_METADATA_PROGRAM_ID } from '@metaplex-foundation/mpl-token-metadata';
 import { useCluster } from '@providers/cluster';
-import { ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
     AddressLookupTableAccount,
+    type CompiledInnerInstruction,
     ComputeBudgetProgram,
     SystemProgram,
     TransactionInstruction,
     TransactionMessage,
     VersionedMessage,
 } from '@solana/web3.js';
+import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022';
 import { getProgramName } from '@utils/tx';
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
+import { isTokenBatchInstruction, resolveInnerBatchInstructions, TokenBatchCard } from '@/app/features/token-batch';
 import { useAddressLookupTables } from '@/app/providers/accounts';
-import { useAnchorProgram } from '@/app/providers/anchor';
 import { FetchStatus } from '@/app/providers/cache';
 
 import { ErrorCard } from '../common/ErrorCard';
+import { InspectorInstructionCard as InspectorInstructionCardComponent } from '../common/InspectorInstructionCard';
 import { LoadingCard } from '../common/LoadingCard';
 import AnchorDetailsCard from '../instruction/AnchorDetailsCard';
 import { ComputeBudgetDetailsCard } from '../instruction/ComputeBudgetDetailsCard';
 import { SystemDetailsCard } from '../instruction/system/SystemDetailsCard';
+import { TokenDetailsCard } from '../instruction/token/TokenDetailsCard';
 import { AssociatedTokenDetailsCard } from './associated-token/AssociatedTokenDetailsCard';
 import { intoParsedInstruction, intoParsedTransaction } from './into-parsed-data';
 import { UnknownDetailsCard } from './UnknownDetailsCard';
 
-export function InstructionsSection({ message }: { message: VersionedMessage }) {
+const INSPECTOR_RESULT = { err: null };
+
+export function InstructionsSection({
+    message,
+    compiledInnerInstructions,
+}: {
+    message: VersionedMessage;
+    compiledInnerInstructions?: CompiledInnerInstruction[];
+}) {
     // Fetch all address lookup tables
     const hydratedTables = useAddressLookupTables(
-        message.addressTableLookups.map(lookup => lookup.accountKey.toString())
+        message.addressTableLookups.map(lookup => lookup.accountKey.toString()),
     );
     for (let i = 0; i < hydratedTables.length; i++) {
         const table = hydratedTables[i];
@@ -45,21 +60,43 @@ export function InstructionsSection({ message }: { message: VersionedMessage }) 
     }
 
     const allDefined = hydratedTables.every(
-        table => table !== undefined && table[0] instanceof AddressLookupTableAccount
+        table => table !== undefined && table[0] instanceof AddressLookupTableAccount,
     );
     if (!allDefined) {
         return <LoadingCard />;
     }
 
     const addressLookupTableAccounts = (hydratedTables as any as Array<[AddressLookupTableAccount, FetchStatus]>).map(
-        table => table[0]
+        table => table[0],
     );
     const transactionMessage = TransactionMessage.decompile(message, { addressLookupTableAccounts });
+
+    const batchByIndex = compiledInnerInstructions
+        ? resolveInnerBatchInstructions(
+              compiledInnerInstructions,
+              message.getAccountKeys({ addressLookupTableAccounts }),
+              message,
+          )
+        : {};
 
     return (
         <>
             {transactionMessage.instructions.map((ix, index) => {
-                return <InspectorInstructionCard key={index} {...{ index, ix, message }} />;
+                const batchInnerCards = batchByIndex[index]?.map((innerIx, childIndex) => (
+                    <ErrorBoundary key={childIndex} fallback={null}>
+                        <TokenBatchCard index={index} childIndex={childIndex} ix={innerIx} result={INSPECTOR_RESULT} />
+                    </ErrorBoundary>
+                ));
+
+                return (
+                    <InspectorInstructionCard
+                        key={index}
+                        index={index}
+                        ix={ix}
+                        message={message}
+                        innerCards={batchInnerCards}
+                    />
+                );
             })}
         </>
     );
@@ -69,10 +106,12 @@ function InspectorInstructionCard({
     message,
     ix,
     index,
+    innerCards,
 }: {
     message: VersionedMessage;
     ix: TransactionInstruction;
     index: number;
+    innerCards?: React.ReactNode[];
 }) {
     const { cluster, url } = useCluster();
 
@@ -88,19 +127,21 @@ function InspectorInstructionCard({
                 <AnchorDetailsCard
                     anchorProgram={anchorProgram.program}
                     index={index}
-                    // Inner cards and child are not used since we do not know what CPIs
-                    // will be called until simulation happens, and even then, all we
-                    // get is logs, not the TransactionInstructions
                     innerCards={undefined}
                     ix={ix}
-                    // Always display success since it is too complicated to determine
-                    // based on the simulation and pass that result here. Could be added
-                    // later if desired, possibly similar to innerCards from parsing tx
-                    // sim logs.
                     result={{ err: null }}
-                    // Signature is not needed.
                     signature=""
                 />
+            </ErrorBoundary>
+        );
+    }
+
+    if (isTokenBatchInstruction(ix)) {
+        return (
+            <ErrorBoundary
+                fallback={<UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />}
+            >
+                <TokenBatchCard index={index} ix={ix} result={INSPECTOR_RESULT} />
             </ErrorBoundary>
         );
     }
@@ -113,8 +154,6 @@ function InspectorInstructionCard({
 
     switch (ix.programId.toString()) {
         case ASSOCIATED_TOKEN_PROGRAM_ID.toString(): {
-            // NOTE: current limitation is that innerInstructions won't be present at the AssociatedTokenDetailsCard. For that purpose we might need to simulateTransactions to get them.
-
             const asParsedInstruction = intoParsedInstruction(ix);
             return (
                 <AssociatedTokenDetailsCard
@@ -149,7 +188,70 @@ function InspectorInstructionCard({
                     tx={asParsedTransaction}
                     index={index}
                     result={result}
+                    raw={ix}
                 />
+            );
+        }
+        case TOKEN_PROGRAM_ID.toString(): {
+            const asParsedInstruction = intoParsedInstruction(ix);
+            const asParsedTransaction = intoParsedTransaction(ix, message, [asParsedInstruction]);
+            // Only render TokenDetailsCard if the instruction was successfully parsed
+            if (asParsedInstruction.parsed?.type) {
+                return (
+                    <ErrorBoundary
+                        fallback={<UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />}
+                    >
+                        <TokenDetailsCard
+                            key={index}
+                            ix={asParsedInstruction}
+                            tx={asParsedTransaction}
+                            index={index}
+                            result={result}
+                            InstructionCardComponent={InspectorInstructionCardComponent}
+                            message={message}
+                            raw={ix}
+                        />
+                    </ErrorBoundary>
+                );
+            }
+            // Fall through to unknown if parsing failed
+            break;
+        }
+        case TOKEN_2022_PROGRAM_ADDRESS: {
+            const asParsedInstruction = intoParsedInstruction(ix);
+            const asParsedTransaction = intoParsedTransaction(ix, message, [asParsedInstruction]);
+            // Only render TokenDetailsCard if the instruction was successfully parsed
+            if (asParsedInstruction.parsed?.type) {
+                return (
+                    <ErrorBoundary
+                        fallback={<UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />}
+                    >
+                        <TokenDetailsCard
+                            key={index}
+                            ix={asParsedInstruction}
+                            tx={asParsedTransaction}
+                            index={index}
+                            result={result}
+                        />
+                    </ErrorBoundary>
+                );
+            }
+            // Fall through to unknown if parsing failed
+            break;
+        }
+        case MPL_TOKEN_METADATA_PROGRAM_ID: {
+            return (
+                <ErrorBoundary
+                    fallback={<UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />}
+                >
+                    <MetaplexTokenMetadataDetailsCard
+                        key={index}
+                        ix={ix}
+                        index={index}
+                        result={result}
+                        InstructionCardComponent={BaseInstructionCard}
+                    />
+                </ErrorBoundary>
             );
         }
         default: {
@@ -157,5 +259,5 @@ function InspectorInstructionCard({
         }
     }
 
-    return <UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} />;
+    return <UnknownDetailsCard key={index} index={index} ix={ix} programName={programName} innerCards={innerCards} />;
 }

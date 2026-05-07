@@ -1,16 +1,18 @@
 'use client';
 
-import { Connection, programs } from '@metaplex/js';
+import { useTokenMetadata } from '@entities/nft';
+import { useTokenInfo } from '@entities/token-info';
 import { useCluster } from '@providers/cluster';
+import { cn } from '@shared/utils';
 import { PublicKey } from '@solana/web3.js';
 import { displayAddress, TokenLabelInfo } from '@utils/tx';
 import { useClusterPath } from '@utils/url';
 import Link from 'next/link';
 import React from 'react';
 import { useState } from 'react';
-import useAsyncEffect from 'use-async-effect';
 
-import { getTokenInfoWithoutOnChainFallback } from '@/app/utils/token-info';
+import { EditIcon, NicknameEditor, useNickname } from '@/app/features/nicknames';
+import { useVisibility } from '@/app/shared/lib/visibility';
 
 import { Copyable } from './Copyable';
 
@@ -26,6 +28,7 @@ type Props = {
     overrideText?: string;
     tokenLabelInfo?: TokenLabelInfo;
     fetchTokenLabelInfo?: boolean;
+    'aria-label'?: string;
 };
 
 export function Address({
@@ -40,10 +43,14 @@ export function Address({
     overrideText,
     tokenLabelInfo,
     fetchTokenLabelInfo,
+    'aria-label': ariaLabel,
 }: Props) {
     const address = pubkey.toBase58();
-    const { cluster } = useCluster();
+    const { cluster, clusterInfo } = useCluster();
     const addressPath = useClusterPath({ pathname: `/address/${address}` });
+    const [showNicknameEditor, setShowNicknameEditor] = useState(false);
+    const nickname = useNickname(address);
+    const { ref: containerRef, isVisible } = useVisibility(fetchTokenLabelInfo);
 
     const display = displayAddress(address, cluster, tokenLabelInfo);
     if (truncateUnknown && address === display) {
@@ -54,10 +61,11 @@ export function Address({
 
     const metaplexData = useTokenMetadata(useMetadata, address);
     if (metaplexData && metaplexData.data) {
-        addressLabel = metaplexData.data.data.name;
+        addressLabel = metaplexData.data.name;
     }
 
-    const tokenInfo = useTokenInfo(fetchTokenLabelInfo, address);
+    const shouldFetchTokenInfo = fetchTokenLabelInfo && isVisible;
+    const tokenInfo = useTokenInfo(shouldFetchTokenInfo, address, cluster, clusterInfo?.genesisHash);
     if (tokenInfo) {
         addressLabel = displayAddress(address, cluster, tokenInfo);
     }
@@ -69,6 +77,9 @@ export function Address({
     if (overrideText) {
         addressLabel = overrideText;
     }
+
+    // Prepend nickname if exists
+    const displayText = nickname ? `"${nickname}" (${addressLabel})` : addressLabel;
 
     const handleMouseEnter = (text: string) => {
         const elements = document.querySelectorAll(`[data-address="${text}"]`);
@@ -85,82 +96,47 @@ export function Address({
     };
 
     const content = (
-        <Copyable text={address} replaceText={!alignRight}>
-            <span
-                data-address={address}
-                className="font-monospace"
-                onMouseEnter={() => handleMouseEnter(address)}
-                onMouseLeave={() => handleMouseLeave(address)}
+        <div className="d-flex align-items-center gap-2" aria-label={ariaLabel}>
+            <Copyable text={address}>
+                <span
+                    data-address={address}
+                    className="font-monospace"
+                    onMouseEnter={() => handleMouseEnter(address)}
+                    onMouseLeave={() => handleMouseLeave(address)}
+                    title={nickname ? displayText : undefined}
+                >
+                    {link ? (
+                        <Link
+                            className={truncate || nickname ? 'text-truncate address-truncate' : ''}
+                            href={addressPath}
+                        >
+                            {displayText}
+                        </Link>
+                    ) : (
+                        <span className={truncate || nickname ? 'text-truncate address-truncate' : ''}>
+                            {displayText}
+                        </span>
+                    )}
+                </span>
+            </Copyable>
+            <button
+                className="btn btn-sm btn-link p-0 text-muted"
+                onClick={() => setShowNicknameEditor(true)}
+                title="Edit nickname"
+                style={{ fontSize: '0.875rem', lineHeight: 1 }}
             >
-                {link ? (
-                    <Link className={truncate ? 'text-truncate address-truncate' : ''} href={addressPath}>
-                        {addressLabel}
-                    </Link>
-                ) : (
-                    <span className={truncate ? 'text-truncate address-truncate' : ''}>{addressLabel}</span>
-                )}
-            </span>
-        </Copyable>
+                <EditIcon />
+            </button>
+            {showNicknameEditor && <NicknameEditor address={address} onClose={() => setShowNicknameEditor(false)} />}
+        </div>
     );
 
     return (
-        <>
-            <div className={`d-none d-lg-flex align-items-center ${alignRight ? 'justify-content-end' : ''}`}>
+        <span ref={containerRef}>
+            <div className={cn('d-none d-md-flex align-items-center', alignRight && 'justify-content-end')}>
                 {content}
             </div>
-            <div className="d-flex d-lg-none align-items-center">{content}</div>
-        </>
+            <div className="d-flex d-md-none align-items-center">{content}</div>
+        </span>
     );
 }
-const useTokenMetadata = (useMetadata: boolean | undefined, pubkey: string) => {
-    const [data, setData] = useState<programs.metadata.MetadataData>();
-    const { url } = useCluster();
-
-    useAsyncEffect(
-        async isMounted => {
-            if (!useMetadata) return;
-            if (pubkey && !data) {
-                try {
-                    const pda = await programs.metadata.Metadata.getPDA(pubkey);
-                    const connection = new Connection(url);
-                    const metadata = await programs.metadata.Metadata.load(connection, pda);
-                    if (isMounted()) {
-                        setData(metadata.data);
-                    }
-                } catch {
-                    if (isMounted()) {
-                        setData(undefined);
-                    }
-                }
-            }
-        },
-        [useMetadata, pubkey, url, data, setData]
-    );
-    return { data };
-};
-
-const useTokenInfo = (fetchTokenLabelInfo: boolean | undefined, pubkey: string) => {
-    const [info, setInfo] = useState<TokenLabelInfo>();
-    const { cluster, url } = useCluster();
-
-    useAsyncEffect(
-        async isMounted => {
-            if (!fetchTokenLabelInfo) return;
-            if (!info) {
-                try {
-                    const token = await getTokenInfoWithoutOnChainFallback(new PublicKey(pubkey), cluster);
-                    if (isMounted()) {
-                        setInfo(token);
-                    }
-                } catch {
-                    if (isMounted()) {
-                        setInfo(undefined);
-                    }
-                }
-            }
-        },
-        [fetchTokenLabelInfo, pubkey, cluster, url, info, setInfo]
-    );
-
-    return info;
-};

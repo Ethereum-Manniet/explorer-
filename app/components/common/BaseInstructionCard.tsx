@@ -1,5 +1,7 @@
 import { Address } from '@components/common/Address';
 import { useScrollAnchor } from '@providers/scroll-anchor';
+import { CollapsibleCard } from '@shared/ui/collapsible-card';
+import { cn } from '@shared/utils';
 import { ParsedInstruction, SignatureResult, TransactionInstruction } from '@solana/web3.js';
 import getInstructionCardScrollAnchorId from '@utils/get-instruction-card-scroll-anchor-id';
 import React from 'react';
@@ -16,11 +18,16 @@ type InstructionProps = {
     ix: TransactionInstruction | ParsedInstruction;
     defaultRaw?: boolean;
     innerCards?: JSX.Element[];
+    eventCards?: JSX.Element[];
     childIndex?: number;
     // raw can be used to display raw instruction information
     raw?: TransactionInstruction;
     // will be triggered on requesting raw data for instruction, if present
     onRequestRaw?: () => void;
+    // Extra buttons rendered in the card header next to Raw
+    headerButtons?: React.ReactNode;
+    // Show a Collapse/Expand button that hides all card content
+    collapsible?: boolean;
 };
 
 export function BaseInstructionCard({
@@ -30,10 +37,13 @@ export function BaseInstructionCard({
     index,
     ix,
     defaultRaw,
+    eventCards,
     innerCards,
     childIndex,
     raw,
     onRequestRaw,
+    headerButtons,
+    collapsible = false,
 }: InstructionProps) {
     const [resultClass] = ixResult(result, index);
     const [showRaw, setShowRaw] = React.useState(defaultRaw || false);
@@ -46,27 +56,38 @@ export function BaseInstructionCard({
         return setShowRaw(r => !r);
     };
     const scrollAnchorRef = useScrollAnchor(
-        getInstructionCardScrollAnchorId(childIndex != null ? [index + 1, childIndex + 1] : [index + 1])
+        getInstructionCardScrollAnchorId(childIndex != null ? [index + 1, childIndex + 1] : [index + 1]),
     );
     return (
-        <div className="card" ref={scrollAnchorRef}>
-            <div className="card-header">
-                <h3 className="card-header-title mb-0 d-flex align-items-center">
+        <CollapsibleCard
+            ref={scrollAnchorRef}
+            collapsible={collapsible}
+            title={
+                <>
                     <span className={`badge bg-${resultClass}-soft me-2`}>
                         #{index + 1}
                         {childIndex !== undefined ? `.${childIndex + 1}` : ''}
                     </span>
                     {title}
-                </h3>
-
-                <button
-                    disabled={defaultRaw}
-                    className={`btn btn-sm d-flex align-items-center ${showRaw ? 'btn-black active' : 'btn-white'}`}
-                    onClick={rawClickHandler}
-                >
-                    <Code className="me-2" size={13} /> Raw
-                </button>
-            </div>
+                </>
+            }
+            headerButtons={
+                <div className="d-flex align-items-center gap-2">
+                    {headerButtons}
+                    <button
+                        disabled={defaultRaw}
+                        className={cn(
+                            'btn btn-sm d-flex align-items-center',
+                            showRaw ? 'btn-black active' : 'btn-white',
+                            defaultRaw && '!e-pointer-events-auto e-cursor-not-allowed',
+                        )}
+                        onClick={rawClickHandler}
+                    >
+                        <Code className="me-2" size={13} /> Raw
+                    </button>
+                </div>
+            }
+        >
             <div className="table-responsive mb-0">
                 <table className="table table-sm table-nowrap card-table">
                     <tbody className="list">
@@ -96,7 +117,21 @@ export function BaseInstructionCard({
                                 </tr>
                                 <tr>
                                     <td colSpan={3}>
-                                        <div className="inner-cards">{innerCards}</div>
+                                        {/* !e-m-0 overrides the 1.5rem margin from inner-cards
+                                        so the card aligns with the "Inner Instructions" label above */}
+                                        <div className="inner-cards !e-m-0">{innerCards}</div>
+                                    </td>
+                                </tr>
+                            </>
+                        )}
+                        {eventCards && eventCards.length > 0 && (
+                            <>
+                                <tr className="table-sep">
+                                    <td colSpan={3}>Events</td>
+                                </tr>
+                                <tr>
+                                    <td colSpan={3}>
+                                        <div className="inner-cards">{eventCards}</div>
                                     </td>
                                 </tr>
                             </>
@@ -104,7 +139,7 @@ export function BaseInstructionCard({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </CollapsibleCard>
     );
 }
 

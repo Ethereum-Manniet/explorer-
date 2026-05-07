@@ -40,11 +40,15 @@ async function mockFileResponseOnce(data: any, headers: Headers) {
 }
 
 const ORIGIN = 'http://explorer.solana.com';
+const EMPTY_PARAMS = Promise.resolve({});
 
-function requestFactory(uri?: string) {
+function requestFactory(uri?: string): {
+    nextParams: { params: Promise<{ network: string }> };
+    request: Request;
+} {
     const params = new URLSearchParams({ uri: uri ?? '' });
     const request = new Request(`${ORIGIN}/api/metadata/devnet?${params.toString()}`);
-    const nextParams = { params: { network: 'devnet' } };
+    const nextParams = { params: Promise.resolve({ network: 'devnet' }) };
 
     return { nextParams, request };
 }
@@ -98,7 +102,7 @@ describe('Metadata Proxy Route', () => {
                 'Content-Length': '140',
                 'Content-Type': 'application/json',
                 Etag: 'random-etag',
-            })
+            }),
         );
         // @ts-expect-error lookup does not have mocked fn
         dns.lookup.mockResolvedValueOnce([{ address: '8.8.8.8' }]);
@@ -135,7 +139,7 @@ describe('Metadata Proxy Route :: resource fetching', () => {
         });
 
         const request = new Request(`http://localhost:3000/api/metadata/proxy?uri=${encodeURIComponent(testUri)}`);
-        const response = await GET(request, { params: {} });
+        const response = await GET(request, { params: EMPTY_PARAMS });
 
         // Verify response
         expect(response.status).toBe(200);

@@ -1,5 +1,7 @@
-import { Address } from '@components/common/Address';
+import { ProgramField } from '@entities/instruction-card';
 import { useScrollAnchor } from '@providers/scroll-anchor';
+import { CollapsibleCard } from '@shared/ui/collapsible-card';
+import { cn } from '@shared/utils';
 import { ParsedInstruction, SignatureResult, TransactionInstruction, VersionedMessage } from '@solana/web3.js';
 import getInstructionCardScrollAnchorId from '@utils/get-instruction-card-scroll-anchor-id';
 import React from 'react';
@@ -49,47 +51,47 @@ export function InspectorInstructionCard({
         return setShowRaw(r => !r);
     };
     const scrollAnchorRef = useScrollAnchor(
-        getInstructionCardScrollAnchorId(childIndex != null ? [index + 1, childIndex + 1] : [index + 1])
+        getInstructionCardScrollAnchorId(childIndex != null ? [index + 1, childIndex + 1] : [index + 1]),
     );
 
     return (
-        <div className="card" ref={scrollAnchorRef}>
-            <div className="card-header">
-                <h3 className="card-header-title mb-0 d-flex align-items-center">
+        <CollapsibleCard
+            ref={scrollAnchorRef}
+            title={
+                <>
                     <span className={`badge bg-${resultClass}-soft me-2`}>
                         #{index + 1}
                         {childIndex !== undefined ? `.${childIndex + 1}` : ''}
                     </span>
                     {title}
-                </h3>
-
+                </>
+            }
+            headerButtons={
                 <button
                     disabled={defaultRaw}
-                    className={`btn btn-sm d-flex align-items-center ${showRaw ? 'btn-black active' : 'btn-white'}`}
+                    className={cn(
+                        'btn btn-sm d-flex align-items-center',
+                        showRaw ? 'btn-black active' : 'btn-white',
+                        defaultRaw && '!e-pointer-events-auto e-cursor-not-allowed',
+                    )}
                     onClick={rawClickHandler}
                 >
                     <Code className="me-2" size={13} /> Raw
                 </button>
-            </div>
+            }
+        >
             <div className="table-responsive mb-0">
                 <table className="table table-sm table-nowrap card-table">
                     <tbody className="list">
+                        <ProgramField programId={ix.programId} showExtendedInfo={showRaw} />
                         {showRaw ? (
-                            <>
-                                <tr>
-                                    <td>Program</td>
-                                    <td className="text-lg-end">
-                                        <Address pubkey={ix.programId} alignRight link />
-                                    </td>
-                                </tr>
-                                {'parsed' in ix ? (
-                                    <BaseRawParsedDetails ix={ix}>
-                                        {raw ? <BaseRawDetails ix={raw} /> : null}
-                                    </BaseRawParsedDetails>
-                                ) : (
-                                    <BaseRawDetails ix={raw || ix} />
-                                )}
-                            </>
+                            'parsed' in ix ? (
+                                <BaseRawParsedDetails ix={ix}>
+                                    {raw ? <BaseRawDetails ix={raw} /> : null}
+                                </BaseRawParsedDetails>
+                            ) : (
+                                <BaseRawDetails ix={raw || ix} />
+                            )
                         ) : (
                             children
                         )}
@@ -108,7 +110,7 @@ export function InspectorInstructionCard({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </CollapsibleCard>
     );
 }
 

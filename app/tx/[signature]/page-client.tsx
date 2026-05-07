@@ -1,7 +1,5 @@
 'use client';
 
-import { Address } from '@components/common/Address';
-import { BalanceDelta } from '@components/common/BalanceDelta';
 import { ErrorCard } from '@components/common/ErrorCard';
 import { InfoTooltip } from '@components/common/InfoTooltip';
 import { LoadingCard } from '@components/common/LoadingCard';
@@ -13,6 +11,10 @@ import { SignatureContext } from '@components/instruction/SignatureContext';
 import { InstructionsSection } from '@components/transaction/InstructionsSection';
 import { ProgramLogSection } from '@components/transaction/ProgramLogSection';
 import { TokenBalancesCard } from '@components/transaction/TokenBalancesCard';
+import { estimateRequestedComputeUnitsForParsedTransaction } from '@entities/compute-unit';
+import { CUProfilingSection } from '@features/cu-profiling';
+import { Receipt, ViewReceiptButton } from '@features/receipt';
+import { isReceiptEnabled } from '@features/receipt';
 import { FetchStatus } from '@providers/cache';
 import { useCluster } from '@providers/cluster';
 import {
@@ -22,6 +24,7 @@ import {
     useTransactionStatus,
 } from '@providers/transactions';
 import { useFetchTransactionDetails } from '@providers/transactions/parsed';
+import { RefreshButton } from '@shared/ui/refresh-button';
 import { ParsedTransaction, SystemInstruction, SystemProgram, TransactionSignature } from '@solana/web3.js';
 import { Cluster, ClusterStatus } from '@utils/cluster';
 import { displayTimestamp } from '@utils/date';
@@ -30,25 +33,28 @@ import { getTransactionInstructionError } from '@utils/program-err';
 import { intoTransactionInstruction } from '@utils/tx';
 import { useClusterPath } from '@utils/url';
 import useTabVisibility from '@utils/use-tab-visibility';
-import { BigNumber } from 'bignumber.js';
 import bs58 from 'bs58';
 import Link from 'next/link';
-import React, { Suspense, useEffect, useState } from 'react';
-import { RefreshCw, Settings } from 'react-feather';
+import { useSearchParams } from 'next/navigation';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { ZoomIn } from 'react-feather';
 
-import { estimateRequestedComputeUnitsForParsedTransaction } from '@/app/utils/compute-units-schedule';
+import { Button } from '@/app/components/shared/ui/button';
+import { AccountsCard } from '@/app/components/transaction/AccountsCard';
+import { useFetchRawTransaction, useRawTransactionDetails } from '@/app/providers/transactions/raw';
+import { DownloadDropdown } from '@/app/shared/components/DownloadDropdown';
 import { getEpochForSlot } from '@/app/utils/epoch-schedule';
 
-const AUTO_REFRESH_INTERVAL = 2000;
+export const AUTO_REFRESH_INTERVAL = 2000;
 const ZERO_CONFIRMATION_BAILOUT = 5;
 
-enum AutoRefresh {
+export enum AutoRefresh {
     Active,
     Inactive,
     BailedOut,
 }
 
-type AutoRefreshProps = {
+export type AutoRefreshProps = {
     autoRefresh: AutoRefresh;
 };
 
@@ -58,7 +64,7 @@ type Props = Readonly<{
 
 function getTransactionErrorReason(
     info: TransactionStatusInfo,
-    tx: ParsedTransaction | undefined
+    tx: ParsedTransaction | undefined,
 ): { errorReason: string; errorLink?: string } {
     if (typeof info.result.err === 'string') {
         return { errorReason: `Runtime Error: "${info.result.err}"` };
@@ -71,8 +77,8 @@ function getTransactionErrorReason(
 
     const { InsufficientFundsForRent } = info.result.err as { InsufficientFundsForRent?: { account_index: number } };
     if (InsufficientFundsForRent !== undefined) {
-        if (tx) {
-            const address = tx.message.accountKeys[InsufficientFundsForRent.account_index].pubkey;
+        const address = tx?.message.accountKeys[InsufficientFundsForRent.account_index]?.pubkey;
+        if (address) {
             return { errorLink: `/address/${address}`, errorReason: `Insufficient Funds For Rent: ${address}` };
         }
         return { errorReason: `Insufficient Funds For Rent: Account #${InsufficientFundsForRent.account_index + 1}` };
@@ -83,13 +89,14 @@ function getTransactionErrorReason(
 
 export default function TransactionDetailsPageClient({ params: { signature: raw } }: Props) {
     let signature: TransactionSignature | undefined;
+    const searchParams = useSearchParams();
 
     try {
         const decoded = bs58.decode(raw);
         if (decoded.length === 64) {
             signature = raw;
         }
-    } catch (err) {
+    } catch (_err) {
         /* empty */
     }
 
@@ -119,6 +126,10 @@ export default function TransactionDetailsPageClient({ params: { signature: raw 
         }
     }, [status, autoRefresh, setZeroConfirmationRetries]);
 
+    if (isReceiptEnabled && searchParams.get('view') === 'receipt' && signature) {
+        return <Receipt signature={signature} autoRefresh={autoRefresh} />;
+    }
+
     return (
         <div className="container mt-n3">
             <div className="header">
@@ -145,10 +156,25 @@ export default function TransactionDetailsPageClient({ params: { signature: raw 
 
 function StatusCard({ signature, autoRefresh }: SignatureProps & AutoRefreshProps) {
     const fetchStatus = useFetchTransactionStatus();
+    const fetchRaw = useFetchRawTransaction();
     const status = useTransactionStatus(signature);
     const details = useTransactionDetails(signature);
+    const rawDetails = useRawTransactionDetails(signature);
     const { cluster, clusterInfo, name: clusterName, status: clusterStatus, url: clusterUrl } = useCluster();
     const inspectPath = useClusterPath({ pathname: `/tx/${signature}/inspect` });
+    const receiptPath = useClusterPath({
+        additionalParams: new URLSearchParams({ view: 'receipt' }),
+        pathname: `/tx/${signature}`,
+    });
+
+    const rawMessage = rawDetails?.data?.raw?.message;
+    const serializedRawData = useMemo(() => rawMessage?.serialize(), [rawMessage]);
+
+    useEffect(() => {
+        if (!rawDetails && clusterStatus === ClusterStatus.Connected) {
+            fetchRaw(signature);
+        }
+    }, [signature, clusterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch transaction on load
     useEffect(() => {
@@ -235,20 +261,34 @@ function StatusCard({ signature, autoRefresh }: SignatureProps & AutoRefreshProp
 
     return (
         <div className="card">
-            <div className="card-header align-items-center">
+            <div className="card-header align-items-center e-gap-2">
                 <h3 className="card-header-title">Overview</h3>
-                <Link className="btn btn-white btn-sm me-2" href={inspectPath}>
-                    <Settings className="align-text-top me-2" size={13} />
-                    Inspect
-                </Link>
+                <ViewReceiptButton
+                    signature={signature}
+                    transactionWithMeta={transactionWithMeta}
+                    receiptPath={receiptPath}
+                />
+                <Button variant="outline" size="sm" asChild aria-label="Inspect">
+                    <Link href={inspectPath}>
+                        <ZoomIn size={12} />
+                        <span className="d-none d-md-inline">Inspect</span>
+                    </Link>
+                </Button>
                 {autoRefresh === AutoRefresh.Active ? (
                     <span className="spinner-grow spinner-grow-sm"></span>
                 ) : (
-                    <button className="btn btn-white btn-sm" onClick={() => fetchStatus(signature)}>
-                        <RefreshCw className="align-text-top me-2" size={13} />
-                        Refresh
-                    </button>
+                    <RefreshButton analyticsSection="transaction_card" onClick={() => fetchStatus(signature)} />
                 )}
+                <DownloadDropdown
+                    filename={signature}
+                    data={serializedRawData}
+                    loading={rawDetails?.status === FetchStatus.Fetching}
+                    error={
+                        rawDetails?.status === FetchStatus.FetchFailed
+                            ? new Error('Failed to fetch raw transaction')
+                            : undefined
+                    }
+                />
             </div>
 
             <TableCardBody>
@@ -400,82 +440,13 @@ function DetailsSection({ signature }: SignatureProps) {
 
     return (
         <>
-            <AccountsCard signature={signature} />
+            <Suspense fallback={<LoadingCard message="Loading accounts" />}>
+                <AccountsCard signature={signature} />
+            </Suspense>
             <TokenBalancesCard signature={signature} />
             <InstructionsSection signature={signature} />
             <ProgramLogSection signature={signature} />
+            <CUProfilingSection signature={signature} />
         </>
-    );
-}
-
-function AccountsCard({ signature }: SignatureProps) {
-    const details = useTransactionDetails(signature);
-
-    const transactionWithMeta = details?.data?.transactionWithMeta;
-    if (!transactionWithMeta) {
-        return null;
-    }
-
-    const { meta, transaction } = transactionWithMeta;
-    const { message } = transaction;
-
-    if (!meta) {
-        return <ErrorCard text="Transaction metadata is missing" />;
-    }
-
-    const accountRows = message.accountKeys.map((account, index) => {
-        const pre = meta.preBalances[index];
-        const post = meta.postBalances[index];
-        const pubkey = account.pubkey;
-        const key = account.pubkey.toBase58();
-        const delta = new BigNumber(post).minus(new BigNumber(pre));
-
-        return (
-            <tr key={key}>
-                <td>{index + 1}</td>
-                <td>
-                    <Address pubkey={pubkey} link fetchTokenLabelInfo />
-                </td>
-                <td>
-                    <BalanceDelta delta={delta} isSol />
-                </td>
-                <td>
-                    <SolBalance lamports={post} />
-                </td>
-                <td>
-                    {index === 0 && <span className="badge bg-info-soft me-1">Fee Payer</span>}
-                    {account.signer && <span className="badge bg-info-soft me-1">Signer</span>}
-                    {account.writable && <span className="badge bg-danger-soft me-1">Writable</span>}
-                    {message.instructions.find(ix => ix.programId.equals(pubkey)) && (
-                        <span className="badge bg-warning-soft me-1">Program</span>
-                    )}
-                    {account.source === 'lookupTable' && (
-                        <span className="badge bg-gray-soft me-1">Address Table Lookup</span>
-                    )}
-                </td>
-            </tr>
-        );
-    });
-
-    return (
-        <div className="card">
-            <div className="card-header">
-                <h3 className="card-header-title">Account Input(s)</h3>
-            </div>
-            <div className="table-responsive mb-0">
-                <table className="table table-sm table-nowrap card-table">
-                    <thead>
-                        <tr>
-                            <th className="text-muted">#</th>
-                            <th className="text-muted">Address</th>
-                            <th className="text-muted">Change (SOL)</th>
-                            <th className="text-muted">Post Balance (SOL)</th>
-                            <th className="text-muted">Details</th>
-                        </tr>
-                    </thead>
-                    <tbody className="list">{accountRows}</tbody>
-                </table>
-            </div>
-        </div>
     );
 }

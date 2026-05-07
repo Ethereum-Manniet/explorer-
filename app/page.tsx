@@ -2,7 +2,6 @@
 
 import { Epoch } from '@components/common/Epoch';
 import { ErrorCard } from '@components/common/ErrorCard';
-import { LoadingCard } from '@components/common/LoadingCard';
 import { Slot } from '@components/common/Slot';
 import { TableCardBody } from '@components/common/TableCardBody';
 import { TimestampToggle } from '@components/common/TimestampToggle';
@@ -24,6 +23,7 @@ import { percentage } from '@utils/math';
 import React from 'react';
 
 import { DeveloperResources } from './components/DeveloperResources';
+import { SimpleCardSkeleton } from './components/shared/Skeletons';
 import { UpcomingFeatures } from './utils/feature-gate/UpcomingFeatures';
 
 export default function Page() {
@@ -50,6 +50,15 @@ export default function Page() {
         </StatsProvider>
     );
 }
+
+const LoadingStatsCard = ({ title }: { title: string }) => {
+    return (
+        <div className="e-flex e-items-center e-gap-2">
+            <span className="spinner-grow spinner-grow-sm" />
+            {title}
+        </div>
+    );
+};
 
 function StakingComponent() {
     const { status } = useCluster();
@@ -89,9 +98,19 @@ function StakingComponent() {
     }
 
     if (supply === Status.Idle || supply === Status.Connecting) {
-        return <LoadingCard message="Loading supply data" />;
+        return (
+            <div className="e-flex e-gap-6">
+                <SimpleCardSkeleton title={<LoadingStatsCard title="Loading supply data" />} />
+                <SimpleCardSkeleton title={<LoadingStatsCard title="Loading staking data" />} />
+            </div>
+        );
     } else if (typeof supply === 'string') {
         return <ErrorCard text={supply} retry={fetchData} />;
+    }
+
+    // Don't display the staking card if the supply is 0
+    if (supply.circulating === BigInt(0) && supply.total === BigInt(0)) {
+        return null;
     }
 
     // Calculate to 2dp for accuracy, then display as 1

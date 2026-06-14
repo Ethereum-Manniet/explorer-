@@ -7,6 +7,10 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
+import { Button } from '@/app/components/shared/ui/button';
+import { Card, CardBody, CardHeader, CardTitle } from '@/app/shared/ui/Card';
+import { FormControl } from '@/app/shared/ui/FormControl';
+
 import { getNickname, MAX_NICKNAME_LENGTH, removeNickname, setNickname } from '../lib/nicknames';
 
 type Props = {
@@ -56,74 +60,82 @@ export function NicknameEditor({ address, onClose }: Props) {
 
     return (
         <div
-            className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+            className="e-fixed e-left-0 e-top-0 e-flex e-h-full e-w-full e-items-center e-justify-center"
             style={{
                 backgroundColor: 'rgba(0, 0, 0, 0.5)',
                 zIndex: 9999,
             }}
             onClick={onClose}
         >
-            <div
-                className="card shadow-lg"
+            <Card
+                ui="dashkit"
+                className="e-shadow-lg"
                 style={{ maxWidth: '500px', minWidth: '400px' }}
                 onClick={e => e.stopPropagation()}
             >
-                <div className="card-header">
-                    <h5 className="card-header-title mb-0">Edit Nickname</h5>
-                </div>
-                <div className="card-body">
-                    <div className="mb-3">
-                        <label className="form-label small text-muted">Address</label>
-                        <div className="font-monospace small text-truncate">{address}</div>
+                <CardHeader ui="dashkit">
+                    <CardTitle as="h5" ui="dashkit">
+                        Edit Nickname
+                    </CardTitle>
+                </CardHeader>
+                <CardBody ui="dashkit">
+                    <div className="e-mb-3">
+                        <label className="e-mb-2 e-inline-block e-text-sm e-text-dk-gray-700">Address</label>
+                        <div className="e-truncate e-font-mono e-text-sm">{address}</div>
                     </div>
-                    <div className="mb-3">
-                        <label htmlFor="nickname-input" className="form-label">
+                    <div className="e-mb-3">
+                        <label htmlFor="nickname-input" className="e-mb-2 e-inline-block">
                             Nickname
                         </label>
-                        <input
-                            id="nickname-input"
-                            ref={inputRef}
-                            type="text"
-                            className="form-control"
-                            value={nickname}
-                            onChange={e => setNicknameLocal(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Enter a memorable name..."
-                            maxLength={MAX_NICKNAME_LENGTH}
-                            autoFocus
-                        />
-                        <div className="d-flex justify-content-between">
-                            <small className="text-muted">This nickname is stored locally on your device.</small>
-                            <small className="text-muted">
+                        <FormControl>
+                            <input
+                                id="nickname-input"
+                                ref={inputRef}
+                                type="text"
+                                value={nickname}
+                                onChange={e => setNicknameLocal(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Enter a memorable name..."
+                                maxLength={MAX_NICKNAME_LENGTH}
+                                autoFocus
+                            />
+                        </FormControl>
+                        <div className="e-flex e-justify-between">
+                            <small className="e-text-dk-gray-700">
+                                This nickname is stored locally on your device.
+                            </small>
+                            <small className="e-text-dk-gray-700">
                                 {nickname.length}/{MAX_NICKNAME_LENGTH}
                             </small>
                         </div>
                     </div>
-                    <div className="d-flex justify-content-between">
+                    <div className="e-flex e-justify-between">
                         <div>
                             {getNickname(address) && (
-                                <button className="btn btn-sm btn-outline-danger" onClick={handleRemove}>
+                                <Button ui="dashkit" variant="outline-danger" size="sm" onClick={handleRemove}>
                                     Remove
-                                </button>
+                                </Button>
                             )}
                         </div>
-                        <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-secondary" onClick={onClose}>
+                        <div className="e-flex e-gap-1.5">
+                            <Button ui="dashkit" variant="secondary" size="sm" onClick={onClose}>
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 ref={saveButtonRef}
-                                className="btn btn-sm btn-primary"
+                                ui="dashkit"
+                                variant="primary"
+                                size="sm"
                                 onClick={handleSave}
                                 onKeyDown={handleSaveButtonKeyDown}
                                 disabled={!nickname.trim()}
                             >
                                 Save
-                            </button>
+                            </Button>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardBody>
+            </Card>
         </div>
     );
 }

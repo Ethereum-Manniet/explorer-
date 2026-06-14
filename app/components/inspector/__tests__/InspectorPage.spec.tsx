@@ -7,9 +7,11 @@ import React from 'react';
 import type { Key } from 'swr';
 import { describe, expect, type Mock, test, vi } from 'vitest';
 
+import { InstructionParserProvider } from '@/app/entities/instruction-parser';
 import { AccountsProvider } from '@/app/providers/accounts';
 import { ClusterProvider } from '@/app/providers/cluster';
 import { ScrollAnchorProvider } from '@/app/providers/scroll-anchor';
+import { instructionParserDispatcher } from '@/app/tx/instruction-parser-dispatcher';
 
 import { TransactionInspectorPage } from '../InspectorPage';
 
@@ -78,7 +80,9 @@ describe('TransactionInspectorPage with Squads Transaction', () => {
         expect(screen.queryByText(/Inspector Input/i)).toBeNull();
 
         expect(screen.getByText(/Account List \(8\)/i)).not.toBeNull();
-        expect(screen.getByText(/BPF Upgradeable Loader Instruction/i)).not.toBeNull();
+        // The card title splits programName and "Instruction" into separate spans so the
+        // programName can truncate independently on mobile; multiple matches are expected.
+        expect(screen.getAllByText(/BPF Upgradeable Loader/i).length).toBeGreaterThan(0);
     });
 
     test('should render when account loading fails', async () => {
@@ -135,7 +139,9 @@ function setup() {
             <ScrollAnchorProvider>
                 <ClusterProvider>
                     <AccountsProvider>
-                        <TransactionInspectorPage showTokenBalanceChanges={false} />
+                        <InstructionParserProvider dispatcher={instructionParserDispatcher}>
+                            <TransactionInspectorPage showTokenBalanceChanges={false} />
+                        </InstructionParserProvider>
                     </AccountsProvider>
                 </ClusterProvider>
             </ScrollAnchorProvider>,

@@ -78,7 +78,8 @@ describe('AccountHeader', () => {
 
             expect(screen.getByText('Program account')).toBeInTheDocument();
             expect(screen.getByText('Program Account')).toBeInTheDocument();
-            expect(screen.getByAltText('Program logo placeholder')).toBeInTheDocument();
+            // No logo: ProxiedImage shows its decorative placeholder (empty alt), not a named logo image.
+            expect(screen.queryByAltText('Program logo')).not.toBeInTheDocument();
         });
 
         it('should render with trusted program name when no security.txt is available for trusted program', () => {
@@ -96,10 +97,12 @@ describe('AccountHeader', () => {
 
             expect(screen.getByText('Program account')).toBeInTheDocument();
             expect(screen.getByText(programInfo.name)).toBeInTheDocument();
-            expect(screen.getByAltText('Program logo placeholder')).toBeInTheDocument();
+            // No logo: ProxiedImage shows its decorative placeholder (empty alt), not a named logo image.
+            expect(screen.queryByAltText('Program logo')).not.toBeInTheDocument();
         });
 
         it('should render with PMP security.txt data including logo and version for non-trusted program', () => {
+            vi.stubEnv('NEXT_PUBLIC_METADATA_ENABLED', 'false');
             const pmpSecurityTxt = createPmpSecurityTxt();
             vi.mocked(useSecurityTxt).mockReturnValue(pmpSecurityTxt);
 
@@ -124,6 +127,7 @@ describe('AccountHeader', () => {
         });
 
         it('should render with trusted program name and PMP security.txt logo/version for trusted program', () => {
+            vi.stubEnv('NEXT_PUBLIC_METADATA_ENABLED', 'false');
             const pmpSecurityTxt = createPmpSecurityTxt();
             vi.mocked(useSecurityTxt).mockReturnValue(pmpSecurityTxt);
 
@@ -185,8 +189,8 @@ describe('AccountHeader', () => {
 
             expect(screen.getByText('Program account')).toBeInTheDocument();
             expect(screen.getByText('Test Program')).toBeInTheDocument();
-            expect(screen.getByAltText('Program logo placeholder')).toBeInTheDocument();
             expect(screen.queryByText('1.0.0')).not.toBeInTheDocument();
+            // No logo: only ProxiedImage's decorative placeholder (empty alt), no named logo image.
             expect(screen.queryByAltText('Program logo')).not.toBeInTheDocument();
         });
 
@@ -208,8 +212,8 @@ describe('AccountHeader', () => {
 
             expect(screen.getByText('Program account')).toBeInTheDocument();
             expect(screen.getByText(programInfo.name)).toBeInTheDocument();
-            expect(screen.getByAltText('Program logo placeholder')).toBeInTheDocument();
             expect(screen.queryByText('1.0.0')).not.toBeInTheDocument();
+            // No logo: only ProxiedImage's decorative placeholder (empty alt), no named logo image.
             expect(screen.queryByAltText('Program logo')).not.toBeInTheDocument();
         });
 

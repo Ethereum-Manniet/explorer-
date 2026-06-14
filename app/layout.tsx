@@ -13,15 +13,16 @@ import { isEnvEnabled } from '@utils/env';
 import { BotIdClient } from 'botid/client';
 import type { Viewport } from 'next';
 import { Rubik } from 'next/font/google';
-import { Metadata } from 'next/types';
+import { type Metadata } from 'next/types';
 import { Suspense } from 'react';
 
 import { SearchBar } from '@/app/components/SearchBarLoader';
 import { TokenInfoBatchProvider } from '@/app/entities/token-info';
 import { CookieConsent } from '@/app/features/cookie';
 import { VisibilityProvider } from '@/app/shared/lib/visibility';
+import { PageContainer } from '@/app/shared/ui/page-container/PageContainer';
 
-import { botIdProtectedRoutes } from '../middleware';
+import { botIdProtectedRoutes } from '../proxy';
 
 export const metadata: Metadata = {
     description: 'Inspect transactions, accounts, blocks, and more on the Solana blockchain',
@@ -53,7 +54,8 @@ export default function RootLayout({ analytics, children }: { analytics: React.R
                     protect={isEnvEnabled(process.env.NEXT_PUBLIC_BOTID_ENABLED) ? botIdProtectedRoutes : []}
                 />
             </head>
-            <body>
+            {/* suppressHydrationWarning: browser extensions (e.g. wallet adapters, password managers) may inject attributes onto <body>, causing a mismatch */}
+            <body suppressHydrationWarning>
                 <Suspense fallback={null}>
                     <ScrollAnchorProvider>
                         <ClusterProvider>
@@ -61,17 +63,17 @@ export default function RootLayout({ analytics, children }: { analytics: React.R
                                 <TokenInfoBatchProvider>
                                     <ClusterModal />
                                     <div className="e-flex e-min-h-screen e-flex-col">
-                                        <div className="main-content pb-4 e-flex-1">
+                                        <div className="e-min-w-[292px] e-flex-1 e-pb-6">
                                             <Navbar>
                                                 <SearchBar />
                                             </Navbar>
                                             <MessageBanner />
-                                            <div className="container my-3 d-xl-none">
+                                            <PageContainer className="e-my-3 xl:e-hidden">
                                                 <SearchBar />
-                                            </div>
-                                            <div className="container my-3 d-lg-none">
+                                            </PageContainer>
+                                            <PageContainer className="e-my-3 lg:e-hidden">
                                                 <ClusterStatusButton />
-                                            </div>
+                                            </PageContainer>
                                             {children}
                                         </div>
                                         <Footer />

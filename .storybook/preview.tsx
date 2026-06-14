@@ -6,6 +6,20 @@ import type { Preview } from '@storybook/react';
 import { Rubik } from 'next/font/google';
 import React, { useEffect } from 'react';
 
+// Storybook serialises story args with JSON.stringify (for the controls panel and inter-frame
+// messaging), which throws on BigInt. Story fixtures here use BigInt for lamports / epoch values,
+// so teach BigInt how to encode itself as a string.
+
+declare global {
+    interface BigInt {
+        toJSON(): string;
+    }
+}
+
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
+
 // Load font with display: swap for better loading behavior
 const rubikFont = Rubik({
     display: 'swap',
@@ -22,8 +36,9 @@ const preview: Preview = {
         },
         backgrounds: {
             options: {
-                dark: { name: 'Dark', value: '#161a19' },
+                dark: { name: 'Dark', value: 'oklch(21.6% 0.0081 169.6)' },
                 card: { name: 'Card', value: '#1e2423' },
+                light: { name: 'Light', value: 'oklch(96.5% 0.005 86)' },
             },
         },
         controls: {
@@ -35,6 +50,24 @@ const preview: Preview = {
             },
         },
         layout: 'padded',
+        options: {
+            // Deterministic sidebar order: alphabetical, with `Responsive` groups last among
+            // siblings. Must be self-contained — Storybook stringifies this function.
+            storySort: (a, b) => {
+                if (a.title === b.title) return 0; // keep story definition order within a file
+                const ap = a.title.split('/');
+                const bp = b.title.split('/');
+                for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
+                    const as = ap[i] ?? '';
+                    const bs = bp[i] ?? '';
+                    if (as === bs) continue;
+                    if (as === 'Responsive') return 1;
+                    if (bs === 'Responsive') return -1;
+                    return as.localeCompare(bs, undefined, { numeric: true });
+                }
+                return 0;
+            },
+        },
     },
 
     decorators: [

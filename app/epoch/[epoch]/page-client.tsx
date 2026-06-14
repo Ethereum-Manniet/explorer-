@@ -12,6 +12,8 @@ import { ClusterStatus } from '@utils/cluster';
 import { displayTimestampUtc } from '@utils/date';
 import React from 'react';
 
+import { Card, CardHeader, CardTitle } from '@/app/shared/ui/Card';
+import { PageContainer } from '@/app/shared/ui/page-container/PageContainer';
 import { getFirstSlotInEpoch, getLastSlotInEpoch } from '@/app/utils/epoch-schedule';
 
 type Props = {
@@ -29,15 +31,15 @@ export default function EpochDetailsPageClient({ params: { epoch } }: Props) {
     }
 
     return (
-        <div className="container mt-n3">
-            <div className="header">
-                <div className="header-body">
-                    <h6 className="header-pretitle">Details</h6>
-                    <h2 className="header-title">Epoch</h2>
+        <PageContainer variant="pulled-up">
+            <div className="e-mb-8">
+                <div className="e-border-0 e-border-b e-border-solid e-border-dk-gray-700-dark e-py-6">
+                    <h6 className="e-uppercase e-tracking-[0.08em] e-text-dk-gray-700">Details</h6>
+                    <h2 className="e-mb-0">Epoch</h2>
                 </div>
             </div>
             {output}
-        </div>
+        </PageContainer>
     );
 }
 
@@ -78,85 +80,87 @@ function EpochOverviewCard({ epoch }: OverviewProps) {
 
     return (
         <>
-            <div className="card">
-                <div className="card-header">
-                    <h3 className="card-header-title mb-0 d-flex align-items-center">Overview</h3>
-                </div>
+            <Card ui="dashkit">
+                <CardHeader ui="dashkit">
+                    <CardTitle as="h3" ui="dashkit" className="e-flex e-items-center">
+                        Overview
+                    </CardTitle>
+                </CardHeader>
                 <TableCardBody>
                     <tr>
-                        <td className="w-100">Epoch</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">Epoch</td>
+                        <td className="e-text-right e-font-mono">
                             <Epoch epoch={epoch} />
                         </td>
                     </tr>
                     {epoch > 0 && (
                         <tr>
-                            <td className="w-100">Previous Epoch</td>
-                            <td className="text-lg-end font-monospace">
+                            <td className="e-w-full">Previous Epoch</td>
+                            <td className="e-text-right e-font-mono">
                                 <Epoch epoch={epoch - 1} link />
                             </td>
                         </tr>
                     )}
                     <tr>
-                        <td className="w-100">Next Epoch</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">Next Epoch</td>
+                        <td className="e-text-right e-font-mono">
                             {currentEpoch > epoch ? (
                                 <Epoch epoch={epoch + 1} link />
                             ) : (
-                                <span className="text-muted">Epoch in progress</span>
+                                <span className="e-text-dk-gray-700">Epoch in progress</span>
                             )}
                         </td>
                     </tr>
                     <tr>
-                        <td className="w-100">First Slot</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">First Slot</td>
+                        <td className="e-text-right e-font-mono">
                             <Slot slot={firstSlot} />
                         </td>
                     </tr>
                     <tr>
-                        <td className="w-100">Last Slot</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">Last Slot</td>
+                        <td className="e-text-right e-font-mono">
                             <Slot slot={lastSlot} />
                         </td>
                     </tr>
                     {epochState.data.firstTimestamp && (
                         <tr>
-                            <td className="w-100">First Block Timestamp</td>
-                            <td className="text-lg-end">
-                                <span className="font-monospace">
+                            <td className="e-w-full">First Block Timestamp</td>
+                            <td className="e-text-right">
+                                <span className="e-font-mono">
                                     {displayTimestampUtc(epochState.data.firstTimestamp * 1000, true)}
                                 </span>
                             </td>
                         </tr>
                     )}
                     <tr>
-                        <td className="w-100">First Block</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">First Block</td>
+                        <td className="e-text-right e-font-mono">
                             <Slot slot={epochState.data.firstBlock} link />
                         </td>
                     </tr>
                     <tr>
-                        <td className="w-100">Last Block</td>
-                        <td className="text-lg-end font-monospace">
+                        <td className="e-w-full">Last Block</td>
+                        <td className="e-text-right e-font-mono">
                             {epochState.data.lastBlock !== undefined ? (
                                 <Slot slot={epochState.data.lastBlock} link />
                             ) : (
-                                <span className="text-muted">Epoch in progress</span>
+                                <span className="e-text-dk-gray-700">Epoch in progress</span>
                             )}
                         </td>
                     </tr>
                     {epochState.data.lastTimestamp && (
                         <tr>
-                            <td className="w-100">Last Block Timestamp</td>
-                            <td className="text-lg-end">
-                                <span className="font-monospace">
+                            <td className="e-w-full">Last Block Timestamp</td>
+                            <td className="e-text-right">
+                                <span className="e-font-mono">
                                     {displayTimestampUtc(epochState.data.lastTimestamp * 1000, true)}
                                 </span>
                             </td>
                         </tr>
                     )}
                 </TableCardBody>
-            </div>
+            </Card>
         </>
     );
 }

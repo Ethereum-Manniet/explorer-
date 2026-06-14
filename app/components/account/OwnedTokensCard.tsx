@@ -13,15 +13,14 @@ import { FetchStatus } from '@providers/cache';
 import { cn } from '@shared/utils';
 import { PublicKey } from '@solana/web3.js';
 import { BigNumber } from 'bignumber.js';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import React, { useCallback, useMemo } from 'react';
 import { ChevronDown } from 'react-feather';
 
-import { getProxiedUri } from '@/app/features/metadata/utils';
+import { ProxiedImage } from '@/app/features/metadata';
 import { INITIAL_VISIBLE_COUNT, LOAD_MORE_COUNT } from '@/app/features/token-history/config';
-import TokenLogoPlaceholder from '@/app/img/logos-solana/low-contrast-solana-logo.svg';
+import { CardFooter, CardHeader } from '@/app/shared/ui/Card';
 import { normalizeTokenAmount } from '@/app/utils';
 
 type Display = 'summary' | 'detail' | null;
@@ -77,19 +76,22 @@ export function OwnedTokensCard({ address }: { address: string }) {
             {showDropdown && <div className="dropdown-exit" onClick={() => setDropdown(false)} />}
 
             <div className="card">
-                <div className="card-header align-items-center">
+                <CardHeader ui="dashkit">
                     <h3 className="card-header-title">Token Holdings</h3>
                     <DisplayDropdown display={display} toggle={() => setDropdown(show => !show)} show={showDropdown} />
-                </div>
+                </CardHeader>
 
-                <div className="table-responsive mb-0">
+                {/* TODO: migrate to <BaseTable variant="card"> from @/app/shared/ui/Table */}
+                <div className="table-responsive e-mb-0">
                     <table className="table table-sm table-nowrap card-table">
                         <thead>
                             <tr>
-                                {showLogos && <th className="text-muted w-1 p-0 text-center">Logo</th>}
-                                {display === 'detail' && <th className="text-muted">Account Address</th>}
-                                <th className="text-muted">Mint Address</th>
-                                <th className="text-muted">{display === 'detail' ? 'Total Balance' : 'Balance'}</th>
+                                {showLogos && <th className="w-1 e-p-0 e-text-center e-text-dk-gray-700">Logo</th>}
+                                {display === 'detail' && <th className="e-text-dk-gray-700">Account Address</th>}
+                                <th className="e-text-dk-gray-700">Mint Address</th>
+                                <th className="e-text-dk-gray-700">
+                                    {display === 'detail' ? 'Total Balance' : 'Balance'}
+                                </th>
                             </tr>
                         </thead>
                         {display === 'detail' ? (
@@ -160,7 +162,7 @@ function HoldingsDetail({
     const visibleTokens = Array.from(mappedTokens.entries()).slice(0, visibleCount);
 
     return (
-        <tbody className="list">
+        <tbody>
             {visibleTokens.map(([mintAddress, token]) => (
                 <TokenRow
                     key={mintAddress}
@@ -209,7 +211,7 @@ function HoldingsSummary({
     const visibleTokens = Array.from(mappedTokens.entries()).slice(0, visibleCount);
 
     return (
-        <tbody className="list">
+        <tbody>
             {visibleTokens.map(([mintAddress, token]) => (
                 <TokenRow
                     key={mintAddress}
@@ -233,30 +235,17 @@ type TokenRowProps = {
 function TokenRow({ mintAddress, token, showLogo, showAccountAddress }: TokenRowProps) {
     const [_, scaledUiAmountMultiplier] = useScaledUiAmountForMint(mintAddress, token.rawAmount);
 
-    const logoURI = token.logoURI ? getProxiedUri(token.logoURI) : undefined;
-
     return (
         <tr>
             {showLogo && (
-                <td className="w-1 p-0 text-center">
-                    {logoURI ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={logoURI}
-                            alt="Token icon"
-                            height={16}
-                            width={16}
-                            className="token-icon rounded-circle border border-4 border-gray-dark"
-                        />
-                    ) : (
-                        <Image
-                            src={TokenLogoPlaceholder}
-                            alt="Token icon placeholder"
-                            height={16}
-                            width={16}
-                            className="e-h-4 e-w-4 e-rounded-full e-object-cover"
-                        />
-                    )}
+                <td className="w-1 e-p-0 e-text-center">
+                    <ProxiedImage
+                        alt="Token icon"
+                        className="e-h-6 e-w-6 e-rounded-full e-border-4 e-border-solid e-border-dk-gray-700-dark"
+                        height={16}
+                        uri={token.logoURI}
+                        width={16}
+                    />
                 </td>
             )}
             {showAccountAddress && token.pubkey && (
@@ -298,11 +287,11 @@ function TokensCardFooter({
     }
 
     return (
-        <div className="card-footer">
-            <button className="btn btn-primary w-100" onClick={loadMore}>
+        <CardFooter ui="dashkit">
+            <button className="btn btn-primary e-w-full" onClick={loadMore}>
                 Load More ({visibleCount} of {totalCount})
             </button>
-        </div>
+        </CardFooter>
     );
 }
 

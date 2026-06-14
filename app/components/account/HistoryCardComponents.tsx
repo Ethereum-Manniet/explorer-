@@ -1,6 +1,9 @@
+import { Button } from '@shared/ui/button';
 import { RefreshButton } from '@shared/ui/refresh-button';
 import { ConfirmedSignatureInfo, TransactionError } from '@solana/web3.js';
 import React from 'react';
+
+import { CardFooter, CardHeader, CardTitle } from '@/app/shared/ui/Card';
 
 export type TransactionRow = {
     slot: number;
@@ -24,10 +27,12 @@ export function HistoryCardHeader({
     fetching: boolean;
 }) {
     return (
-        <div className="card-header align-items-center">
-            <h3 className="card-header-title">{title}</h3>
+        <CardHeader ui="dashkit">
+            <CardTitle as="h3" ui="dashkit">
+                {title}
+            </CardTitle>
             <RefreshButton analyticsSection={analyticsSection} onClick={refresh} fetching={fetching} />
-        </div>
+        </CardHeader>
     );
 }
 
@@ -41,22 +46,28 @@ export function HistoryCardFooter({
     loadMore: () => void;
 }) {
     return (
-        <div className="card-footer">
+        <CardFooter ui="dashkit">
             {foundOldest ? (
-                <div className="text-muted text-center">Fetched full history</div>
+                <div className="e-text-center e-text-dk-gray-700">Fetched full history</div>
             ) : (
-                <button className="btn btn-primary w-100" onClick={() => loadMore()} disabled={fetching}>
+                <Button
+                    ui="dashkit"
+                    variant="primary"
+                    className="e-w-full"
+                    onClick={() => loadMore()}
+                    disabled={fetching}
+                >
                     {fetching ? (
                         <>
-                            <span className="align-text-top spinner-grow spinner-grow-sm me-2"></span>
+                            <span className="e-spinner-grow e-spinner-grow-sm e-mr-1.5 e-align-text-top"></span>
                             Loading
                         </>
                     ) : (
                         'Load More'
                     )}
-                </button>
+                </Button>
             )}
-        </div>
+        </CardFooter>
     );
 }
 

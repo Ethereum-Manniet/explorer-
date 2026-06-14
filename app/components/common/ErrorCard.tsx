@@ -1,5 +1,8 @@
 import React from 'react';
 
+import { Button } from '@/app/components/shared/ui/button';
+import { Card, CardBody } from '@/app/shared/ui/Card';
+
 export function ErrorCard({
     retry,
     retryText,
@@ -13,28 +16,34 @@ export function ErrorCard({
 }) {
     const buttonText = retryText || 'Try Again';
     return (
-        <div className="card">
-            <div className="card-body text-center">
+        <Card ui="dashkit">
+            <CardBody ui="dashkit" className="e-text-center">
                 {text}
                 {retry && (
                     <>
-                        <span className="btn btn-white ms-3 d-none d-md-inline" onClick={retry}>
-                            {buttonText}
-                        </span>
-                        <div className="d-block d-md-none mt-4">
-                            <span className="btn btn-white w-100" onClick={retry}>
-                                {buttonText}
-                            </span>
+                        <Button
+                            ui="dashkit"
+                            variant="white"
+                            className="e-ml-3 e-hidden md:e-inline"
+                            onClick={retry}
+                            asChild
+                        >
+                            <span>{buttonText}</span>
+                        </Button>
+                        <div className="e-mt-6 e-block md:e-hidden">
+                            <Button ui="dashkit" variant="white" className="e-w-full" onClick={retry} asChild>
+                                <span>{buttonText}</span>
+                            </Button>
                         </div>
                         {subtext && (
-                            <div className="text-muted">
+                            <div className="e-text-dk-gray-700">
                                 <hr></hr>
                                 {subtext}
                             </div>
                         )}
                     </>
                 )}
-            </div>
-        </div>
+            </CardBody>
+        </Card>
     );
 }

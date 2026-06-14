@@ -9,6 +9,7 @@ import { useCluster } from '@/app/providers/cluster';
 
 import { NEODYME_SECURITY_TXT_DOC_LINK, PMP_SECURITY_TXT_DOC_LINK } from '../lib/constants';
 
+// FIXME: missing Storybook story — needs useProgramMetadataSecurityTxt SWR mock + useCluster.
 export function ProgramSecurityTXTLabel({ programPubkey }: { programPubkey: PublicKey }) {
     const { url, cluster } = useCluster();
     const { programMetadataSecurityTxt } = useProgramMetadataSecurityTxt(programPubkey.toBase58(), url, cluster);
@@ -22,8 +23,8 @@ export function ProgramSecurityTXTLabel({ programPubkey }: { programPubkey: Publ
                 target="_blank"
                 href={programMetadataSecurityTxt ? PMP_SECURITY_TXT_DOC_LINK : NEODYME_SECURITY_TXT_DOC_LINK}
             >
-                <span className="security-txt-link-color-hack-reee">Security.txt</span>
-                <ExternalLink className="align-text-top ms-2" size={13} />
+                <span className="e-text-dk-white">Security.txt</span>
+                <ExternalLink className="align-text-top e-ml-1.5" size={13} />
             </Link>
         </InfoTooltip>
     );

@@ -5,17 +5,20 @@
 import {
     type AccountMeta,
     AccountRole,
+    type Address,
     address,
     type Instruction,
     type InstructionWithAccounts,
     type InstructionWithData,
-    type ReadonlyUint8Array,
 } from '@solana/kit';
-import type { TransactionInstruction } from '@solana/web3.js';
+import { PublicKey, type TransactionInstruction } from '@solana/web3.js';
 
-type KitInstruction = Instruction<string> &
+// `data` is `Uint8Array` (mutable) rather than `ReadonlyUint8Array` because
+// some downstream kit-shape parsers (e.g. lighthouse) require the mutable type.
+// `@solana-program/*` parsers accept either, so this is the least-common-denominator.
+export type KitInstruction = Instruction<string> &
     InstructionWithAccounts<AccountMeta[]> &
-    InstructionWithData<ReadonlyUint8Array>;
+    InstructionWithData<Uint8Array>;
 
 export function toKitInstruction(ix: TransactionInstruction): KitInstruction {
     return {
@@ -33,4 +36,12 @@ export function toKitInstruction(ix: TransactionInstruction): KitInstruction {
 function toAccountRole(isSigner: boolean, isWritable: boolean): AccountRole {
     if (isSigner) return isWritable ? AccountRole.WRITABLE_SIGNER : AccountRole.READONLY_SIGNER;
     return isWritable ? AccountRole.WRITABLE : AccountRole.READONLY;
+}
+
+export function toLegacyPublicKey(addr: Address): PublicKey {
+    return new PublicKey(addr);
+}
+
+export function toKitAddress(pubkey: PublicKey): Address {
+    return address(pubkey.toBase58());
 }

@@ -9,9 +9,11 @@ import {
     getAnchorId,
     useTokenExtensionNavigation,
 } from '@/app/features/token-extensions/use-token-extension-navigation';
+import { Card } from '@/app/shared/ui/Card';
+import { BaseTable } from '@/app/shared/ui/Table';
 import { TokenExtension } from '@/app/validators/accounts/token-extension';
 
-import { TokenExtensionBadge } from '../common/TokenExtensionBadge';
+import { TokenExtensionBadge } from './token-extensions/TokenExtensionBadge';
 import { TokenExtensionRow } from './TokenAccountSection';
 import { ParsedTokenExtension } from './types';
 
@@ -118,7 +120,7 @@ function TokenExtensionAccordionItem({
                         aria-pressed={showRaw}
                     >
                         <Badge
-                            className="text-white e-font-normal"
+                            className="e-font-normal e-text-white"
                             as="link"
                             size="sm"
                             status={showRaw ? 'active' : 'inactive'}
@@ -129,7 +131,7 @@ function TokenExtensionAccordionItem({
                     </button>
                     {parsedExtension.externalLinks.map((link, index) => (
                         <a key={index} href={link.url} target="_blank" rel="noopener noreferrer">
-                            <Badge variant="transparent" size="sm" as="link" className="text-white e-font-normal">
+                            <Badge variant="transparent" size="sm" as="link" className="e-font-normal e-text-white">
                                 <ExternalLink size={16} />
                                 {link.label}
                             </Badge>
@@ -139,11 +141,11 @@ function TokenExtensionAccordionItem({
             </div>
             <AccordionContent>
                 {!showRaw ? (
-                    <div className="card e-m-4">
+                    <Card ui="dashkit" className="e-m-4">
                         <TableCardBodyHeaded headerComponent={tableHeaderComponent}>
                             {TokenExtensionRow(extension, undefined, decimals, symbol, 'omit')}
                         </TableCardBodyHeaded>
-                    </div>
+                    </Card>
                 ) : (
                     <div className="e-p-4">
                         <ReactJson src={parsedExtension.parsed || {}} style={{ padding: 25 }} />
@@ -156,16 +158,16 @@ function TokenExtensionAccordionItem({
 
 function TokenExtensionStateHeader({ name }: { name: string }) {
     return (
-        <tr>
-            <th className="text-muted w-1">{name}</th>
-            <th className="text-muted"></th>
-        </tr>
+        <BaseTable.Row>
+            <BaseTable.HeaderCell className="e-w-px e-text-dk-gray-700">{name}</BaseTable.HeaderCell>
+            <BaseTable.HeaderCell className="e-text-dk-gray-700"></BaseTable.HeaderCell>
+        </BaseTable.Row>
     );
 }
 
 function ExtensionListItem({ ext }: { ext: ParsedTokenExtension }) {
     return (
-        <div className="w-100 e-w-100 text-white e-flex e-items-center e-gap-2 e-text-sm">
+        <div className="e-w-100 e-flex e-w-full e-items-center e-gap-2 e-text-sm e-text-white">
             {/* Name */}
             <div className="e-flex e-min-w-80 e-items-center e-gap-2 e-whitespace-nowrap e-font-normal">
                 <span>{ext.name}</span>

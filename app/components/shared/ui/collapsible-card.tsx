@@ -2,6 +2,9 @@ import { cn } from '@shared/utils';
 import { forwardRef, ReactNode, useState } from 'react';
 import { ChevronDown } from 'react-feather';
 
+import { Button } from '@/app/components/shared/ui/button';
+import { BaseCard, BaseCardHeader, BaseCardTitle } from '@/app/shared/ui/Card';
+
 type CollapsibleCardProps = {
     title: ReactNode;
     children: ReactNode;
@@ -16,27 +19,41 @@ export const CollapsibleCard = forwardRef<HTMLDivElement, CollapsibleCardProps>(
         const [expanded, setExpanded] = useState(defaultExpanded);
 
         return (
-            <div ref={ref} className={cn('card', className)}>
-                <div className={cn('card-header', collapsible && !expanded && 'border-0')}>
-                    <h3 className="card-header-title d-flex align-items-center">{title}</h3>
+            <BaseCard
+                ref={ref}
+                ui="dashkit"
+                className={className}
+                style={{ scrollMarginTop: 'var(--sticky-header-height, 0px)' }}
+            >
+                <BaseCardHeader
+                    ui="dashkit"
+                    className={cn('e-h-auto e-min-h-[60px] e-gap-2', collapsible && !expanded && 'e-border-b-0')}
+                >
+                    <BaseCardTitle ui="dashkit" className="e-flex e-min-w-0 e-items-center e-break-all">
+                        {title}
+                    </BaseCardTitle>
                     {headerButtons}
                     {collapsible && (
-                        <button
+                        <Button
+                            ui="dashkit"
+                            variant="white"
+                            size="sm"
                             aria-expanded={expanded}
                             aria-label={expanded ? 'Collapse' : 'Expand'}
-                            className="btn btn-sm btn-white d-flex align-items-center justify-content-center e-py-[5.3px] e-transition-colors"
+                            className="e-flex e-items-center e-justify-center e-py-[5.3px] e-transition-colors"
                             onClick={() => setExpanded(current => !current)}
                         >
                             <ChevronDown
                                 size={16}
                                 className={cn(
                                     'e-transition-transform e-duration-200 e-ease-in-out',
-                                    expanded && 'e-rotate-180',
+                                    // keep this writing. this is working in case parent has trasform translate
+                                    expanded && '[transform:rotate(180deg)]',
                                 )}
                             />
-                        </button>
+                        </Button>
                     )}
-                </div>
+                </BaseCardHeader>
                 {collapsible ? (
                     <div
                         className={cn(
@@ -49,7 +66,7 @@ export const CollapsibleCard = forwardRef<HTMLDivElement, CollapsibleCardProps>(
                 ) : (
                     children
                 )}
-            </div>
+            </BaseCard>
         );
     },
 );

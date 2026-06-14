@@ -5,14 +5,18 @@ import { createRef, Suspense } from 'react';
 import { ChevronDown, ExternalLink } from 'react-feather';
 import useAsyncEffect from 'use-async-effect';
 
+import { Badge } from '@/app/components/shared/ui/badge';
+import { Button } from '@/app/components/shared/ui/button';
+import { DropdownMenu } from '@/app/components/shared/ui/dropdown';
 import { getProxiedUri } from '@/app/features/metadata';
 import { useCluster } from '@/app/providers/cluster';
 import { CompressedNft, useCompressedNft, useMetadataJsonLink } from '@/app/providers/compressed-nft';
+import { BaseTable } from '@/app/shared/ui/Table';
 
 import { Address } from '../common/Address';
 import { InfoTooltip } from '../common/InfoTooltip';
 import { LoadingArtPlaceholder } from '../common/LoadingArtPlaceholder';
-import { ArtContent } from '../common/NFTArt';
+import { NFTImageContent } from '../common/NFTArt';
 import { getCreatorDropdownItems, getIsMutablePill, getVerifiedCollectionPill } from './MetaplexNFTHeader';
 import { UnknownAccountCard } from './UnknownAccountCard';
 
@@ -26,47 +30,47 @@ export function CompressedNftCard({ account }: { account: Account }) {
 
     return (
         <AccountCard title="Overview" account={account}>
-            <tr>
-                <td>Address</td>
-                <td className="text-lg-end">
+            <BaseTable.Row>
+                <BaseTable.Cell>Address</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">
                     <Address pubkey={account.pubkey} alignRight raw />
-                </td>
-            </tr>
-            <tr>
-                <td>Owner</td>
-                <td className="text-lg-end">
+                </BaseTable.Cell>
+            </BaseTable.Row>
+            <BaseTable.Row>
+                <BaseTable.Cell>Owner</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">
                     <Address pubkey={new PublicKey(compressedNft.ownership.owner)} alignRight link />
-                </td>
-            </tr>
-            <tr>
-                <td>Verified Collection Address</td>
-                <td className="text-lg-end">
+                </BaseTable.Cell>
+            </BaseTable.Row>
+            <BaseTable.Row>
+                <BaseTable.Cell>Verified Collection Address</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">
                     {collectionGroup ? (
                         <Address pubkey={new PublicKey(collectionGroup.group_value)} alignRight link />
                     ) : (
                         'None'
                     )}
-                </td>
-            </tr>
-            <tr>
-                <td>Update Authority</td>
-                <td className="text-lg-end">
+                </BaseTable.Cell>
+            </BaseTable.Row>
+            <BaseTable.Row>
+                <BaseTable.Cell>Update Authority</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">
                     {updateAuthority ? <Address pubkey={new PublicKey(updateAuthority)} alignRight link /> : 'None'}
-                </td>
-            </tr>
-            <tr>
-                <td>Website</td>
-                <td className="text-lg-end">
+                </BaseTable.Cell>
+            </BaseTable.Row>
+            <BaseTable.Row>
+                <BaseTable.Cell>Website</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">
                     <a rel="noopener noreferrer" target="_blank" href={compressedNft.content.links.external_url}>
                         {compressedNft.content.links.external_url}
-                        <ExternalLink className="align-text-top ms-2" size={13} />
+                        <ExternalLink className="align-text-top e-ml-1.5" size={13} />
                     </a>
-                </td>
-            </tr>
-            <tr>
-                <td>Seller Fee</td>
-                <td className="text-lg-end">{`${compressedNft.royalty.basis_points / 100}%`}</td>
-            </tr>
+                </BaseTable.Cell>
+            </BaseTable.Row>
+            <BaseTable.Row>
+                <BaseTable.Cell>Seller Fee</BaseTable.Cell>
+                <BaseTable.Cell className="e-text-right">{`${compressedNft.royalty.basis_points / 100}%`}</BaseTable.Cell>
+            </BaseTable.Row>
         </AccountCard>
     );
 }
@@ -111,30 +115,37 @@ export function CompressedNFTHeader({ compressedNft }: { compressedNft: Compress
     );
 
     return (
-        <div className="row">
-            <div className="col-auto ms-2 d-flex align-items-center">
-                <ArtContent pubkey={compressedNft.id} data={metadataJson} />
+        <div className="-e-mx-3 e-flex e-flex-wrap">
+            <div className="e-ml-1.5 e-flex e-flex-none e-items-center e-px-3">
+                <NFTImageContent uri={metadataJson?.image} />
             </div>
-            <div className="col mb-3 ms-0.5 mt-3">
-                {<h6 className="header-pretitle ms-1">Metaplex Compressed NFT</h6>}
-                <div className="d-flex align-items-center">
-                    <h2 className="header-title ms-1 align-items-center no-overflow-with-ellipsis">
+            <div className="e-mb-3 e-mt-3 e-min-w-0 e-flex-1 e-px-3">
+                {
+                    <h6 className="e-ml-[3px] e-uppercase e-tracking-[0.08em] e-text-dk-gray-700">
+                        Metaplex Compressed NFT
+                    </h6>
+                }
+                <div className="e-flex e-items-center">
+                    <h2 className="e-mb-0 e-ml-[3px] e-items-center e-overflow-hidden e-text-ellipsis e-whitespace-nowrap">
                         {compressedNft.content.metadata.name !== ''
                             ? compressedNft.content.metadata.name
                             : 'No NFT name was found'}
                     </h2>
                     {getVerifiedCollectionPill()}
                 </div>
-                <h4 className="header-pretitle ms-1 mt-1 no-overflow-with-ellipsis">
+                <h4 className="e-ml-[3px] e-mt-[3px] e-overflow-hidden e-text-ellipsis e-whitespace-nowrap e-uppercase e-tracking-[0.08em] e-text-dk-gray-700">
                     {compressedNft.content.metadata.symbol !== ''
                         ? compressedNft.content.metadata.symbol
                         : 'No Symbol was found'}
                 </h4>
-                <div className="mb-2 mt-2">{getCompressedNftPill()}</div>
-                <div className="mb-3 mt-2">{getIsMutablePill(compressedNft.mutable)}</div>
+                <div className="e-mb-1.5 e-mt-1.5">{getCompressedNftPill()}</div>
+                <div className="e-mb-3 e-mt-1.5">{getIsMutablePill(compressedNft.mutable)}</div>
                 <div className="btn-group">
-                    <button
-                        className="btn btn-dark btn-sm creators-dropdown-button-width"
+                    <Button
+                        ui="dashkit"
+                        variant="dark"
+                        size="sm"
+                        className="e-w-[150px]"
                         type="button"
                         aria-haspopup="true"
                         aria-expanded="false"
@@ -142,8 +153,8 @@ export function CompressedNFTHeader({ compressedNft }: { compressedNft: Compress
                         ref={dropdownRef}
                     >
                         Creators <ChevronDown size={15} className="align-text-top" />
-                    </button>
-                    <div className="dropdown-menu mt-2">{getCreatorDropdownItems(compressedNft.creators)}</div>
+                    </Button>
+                    <DropdownMenu className="e-mt-1.5">{getCreatorDropdownItems(compressedNft.creators)}</DropdownMenu>
                 </div>
             </div>
         </div>
@@ -154,8 +165,10 @@ function getCompressedNftPill() {
     const onchainVerifiedToolTip =
         'This NFT does not have a corresponding account, but uses verified ledger data to allow for transfers and trades. The existence of this tag ensures that the compressed NFT is verifiably up-to-date with the chain.';
     return (
-        <div className={'d-inline-flex align-items-center ms-2'}>
-            <span className="badge badge-pill bg-dark">{'Compressed'}</span>
+        <div className="e-ml-1.5 e-inline-flex e-items-center">
+            <Badge ui="dashkit" variant="dark" tone="solid">
+                Compressed
+            </Badge>
             <InfoTooltip bottom text={onchainVerifiedToolTip} />
         </div>
     );
